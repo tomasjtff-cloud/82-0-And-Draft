@@ -95,5 +95,13 @@ GitHub Pages (`.github/workflows/pages.yml`) queda solo como espejo manual (`wor
 - **Química**: `chemistryLinks` y `previewFbPick` en `lib/ratings/football.ts` reutilizan `computeChemistry` (preview = resultado final, testeado).
 - **UI**: `components/football/{Pitch,FbCardView,FbPlayerSheet,XiModal,SeasonExtras,SeasonView,MonteCarloPanel}.tsx`.
 
+## V4 (resumen técnico)
+- **Química**: `chemistryBreakdown` es la fuente única (docs/CHEMISTRY.md). **Nombres**: `lib/core/names.ts`.
+- **Comparador**: `features/football-draft/compare.ts`; probabilidades exactas `outcomeProbs` (match.ts) sin RNG.
+- **Tácticas**: `football-simulation/tactics.ts` (docs/TACTICS.md); `UserTeamInput.tactic`; Equilibrado = motor previo.
+- **Premios**: `football-simulation/awards.ts`; NBA `nbaInternalAwards` (docs/AWARDS_ACHIEVEMENTS.md).
+- **Progreso**: `lib/progress/{types,summarize,store,achievements,records}.ts`, clave `ll:progress:v1` (docs/STORAGE.md). Los juegos llaman `recordDraft`/`recordSeason`; los logros se notifican con el evento `ll:unlocked`.
+- **i18n**: `lib/i18n` (`T`). **Logo**: `public/brand/legends-lab-mark.svg` → `node scripts/build-icons.cjs`.
+
 ## Estado / siguientes pasos
 Ver `ROADMAP.md`. Al terminar una sesión: actualizar ROADMAP.md y CHANGELOG.md, commit descriptivo, push y verificar.

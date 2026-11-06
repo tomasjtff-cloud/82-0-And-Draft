@@ -4,6 +4,8 @@ import { AppShell } from "@/components/common/AppShell";
 
 export const metadata: Metadata = {
   title: "Legends Lab",
+  applicationName: "Legends Lab",
+  appleWebApp: { capable: true, title: "Legends Lab", statusBarStyle: "black-translucent" },
   description: "NBA 82-0 y Draft de fútbol: drafts históricos y temporadas simuladas. Proyecto personal.",
 };
 export const viewport: Viewport = { themeColor: "#06070a", width: "device-width", initialScale: 1, viewportFit: "cover" };

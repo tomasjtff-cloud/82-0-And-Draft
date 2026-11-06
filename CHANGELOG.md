@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-11-06 (Legends Lab V4)
+### Corregido / explicado
+- Química del caso De Jong: verificada (4 de LaLiga = +1 liga → 1/3 en FUT; correcto). Nuevo desglose único `chemistryBreakdown` y panel **¿Por qué tengo esta química?** con umbrales, compañeros y consejos.
+- Apellidos compuestos en cartas (DE JONG, DI MARÍA, VAN DIJK, DE BRUYNE, VAN DER SAR…) con `shortName()` probado.
+### Añadido
+- Comparador avanzado: impacto proyectado (química, media, ataque/medio/defensa, encaje, ATT/DEF del motor) y probabilidad exacta contra un rival de referencia; sin tocar RNG ni el draft.
+- Tácticas (Equilibrado, Posesión, Contraataque, Presión alta, Bloque bajo) integradas en el motor, Monte Carlo e historial; vista **Mi estilo de juego** (docs/TACTICS.md).
+- Premios de la temporada (Balón de Oro, Bota y Guante de Oro de Legends Lab — Mi equipo, mejores por línea, mejor de Champions) y reconocimientos NBA del quinteto.
+- Finales: pantalla VS con probabilidades del motor, crónica de la final con eventos simulados, jugador del partido; celebración especial del quadruple con compartir.
+- 59 logros (fútbol, NBA, cruzado y secretos) con notificaciones, pantalla **Logros**, **Mi legado** (perfil, nivel, sala de trofeos, récords, salón de la fama).
+- Progreso local versionado con migración del historial y exportar/importar en Ajustes.
+- Móvil: barra de acciones inferior contextual, campo compacto/completo, orden y modo comparar en el cajón; probado en 375×812, 390×844 y 430×932.
+- Interfaz en español con textos centralizados (`src/lib/i18n`).
+- Nuevo logo LL (vector maestro `public/brand/legends-lab-mark.svg`), favicon, Apple Touch Icon y manifest PWA.
+
 ## 0.4.2 — 2026-11-06
 ### Cambiado
 - Fútbol · Historical Roulette: química ampliada. Además de club/nación/liga, cada jugador puede sumar **+1 extra** (máximo uno) si comparte **idioma** con ≥3 del XI (p. ej. Messi–Parejo–Falcao: español), **familia de estilo** con ≥4 (Toque / Vértigo / Fuerza, derivada del arquetipo estimado) o **continente** con ≥4. Tope por jugador sigue en 3 (33 equipo). Calibrado con 300 XI aleatorios: media 16 → 24/33 (p10 20, p90 28).

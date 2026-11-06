@@ -9,6 +9,9 @@ Plataforma personal (sin fines comerciales) con **dos videojuegos deportivos jug
 
 Todo funciona **sin registro, sin claves y sin servicios de pago** (dataset local). Idioma: español.
 
+## Novedades V4
+Química explicable (¿por qué?), comparador con impacto real, tácticas, premios individuales, finales especiales, 59 logros, Mi legado (trofeos, récords, salón de la fama), exportar/importar progreso sin cuenta, interfaz en español y nuevo logo LL. Documentación: `docs/CHEMISTRY.md`, `docs/TACTICS.md`, `docs/AWARDS_ACHIEVEMENTS.md`, `docs/STORAGE.md`.
+
 ## Requisitos e instalación
 
 ```bash

@@ -126,8 +126,13 @@ async function footballFlow() {
     if (!checkedPreview && await page.getByTestId("fb-candidate-open").count() > 1 && await page.getByTestId("view-xi").isEnabled()) {
       await page.getByTestId("fb-compare-toggle").first().click();
       await page.getByTestId("fb-candidate-open").nth(1).click();
+      await page.getByTestId("fb-compare").waitFor();
+      assert(await page.getByTestId("fb-impact-a").isVisible() && await page.getByTestId("fb-impact-b").isVisible(), "side-by-side comparison with projected impact on the XI");
+      await page.getByTestId("sheet-close").click();
+      await page.getByTestId("fb-player-sheet").waitFor({ state: "detached" }).catch(() => {});
+      await page.getByTestId("fb-candidate-open").first().click();
       await page.getByTestId("fb-chem-preview").waitFor();
-      assert(await page.getByTestId("fb-compare").isVisible(), "candidate sheet shows chemistry preview and comparison");
+      assert(await page.getByTestId("fb-impact").isVisible(), "single candidate sheet shows chemistry preview and impact");
       const expected = Number(await page.getByTestId("fb-chem-after").innerText());
       await page.locator('[data-testid="fb-player-sheet"] button[data-testid^="fb-pick-"]').first().click();
       await page.getByTestId("fb-player-sheet").waitFor({ state: "detached" }).catch(() => {});
@@ -143,6 +148,11 @@ async function footballFlow() {
   }
   await page.getByTestId("fb-chemistry").waitFor();
   assert(checkedPreview, "chemistry preview checked during the draft");
+  await page.locator('[data-testid^="fb-slot-"]').first().click();
+  await page.getByTestId("chem-why-open").click();
+  await page.getByTestId("chem-why").waitFor();
+  assert(await page.getByTestId("chem-why-league").isVisible(), "¿Por qué tengo esta química? explains club/league/nation");
+  await page.getByTestId("sheet-close").click();
   await page.getByTestId("fb-chem-mode").click();
   console.log(`  · chemistry mode: ${await page.getByTestId("chem-link").count()} links drawn`);
   await page.getByTestId("view-xi").click();
@@ -152,8 +162,12 @@ async function footballFlow() {
   await page.getByTestId("fb-mc-100").click();
   await page.locator('[data-testid="fb-mc-results"][data-status="done"]').waitFor({ timeout: 120000 });
   assert((await page.getByTestId("fb-mc-progress").innerText()).includes("100 / 100"), "football Monte Carlo ran 100 full seasons in the worker");
+  await page.getByTestId("fb-tactic-press").click();
+  assert((await page.getByTestId("fb-tactic-detail").textContent()).includes("Presión alta"), "tactic detail shows the chosen style");
   await page.getByTestId("fb-quick-sim").click();
   await page.getByTestId("fb-trophies").waitFor({ timeout: 60000 });
+  assert((await page.getByTestId("fb-tactic-used").textContent()).includes("Presión alta"), "season keeps the chosen tactic");
+  assert(await page.getByTestId("fb-season-awards").isVisible(), "season awards from simulated stats");
   for (const t of ["pl", "ucl", "fa", "efl"]) await page.getByTestId(`fb-trophy-${t}`).waitFor();
   assert(true, "four trophy cards");
   await page.getByTestId("fb-tab-summary").click();
@@ -203,33 +217,67 @@ async function footballFlow() {
   await page.getByTestId("fb-mode-fut").click();
   await page.getByTestId("fb-start").click();
   for (let i = 0; i < 30 && !(await page.getByTestId("fb-live-sim").isVisible()); i++) await fbStep();
+  await page.getByTestId("fb-tactic-lowblock").click();
   await page.getByTestId("fb-live-sim").click();
   await page.getByTestId("fb-next-day").click();
   await page.getByTestId("fb-next-day").click();
   await page.getByTestId("fb-sim-rest").click();
   await page.getByTestId("fb-trophies").waitFor({ timeout: 60000 });
   assert(true, "FUT draft + live season completes");
+  // progress: achievements, legacy, export/import, persistence
+  await page.goto(BASE + "/logros");
+  const unlocked = await page.getByTestId("ach-unlocked").innerText();
+  assert(Number(unlocked.split("/")[0]) >= 1, `achievements unlocked (${unlocked})`);
+  await page.goto(BASE + "/legado");
+  await page.getByTestId("trophy-room").waitFor();
+  assert(await page.getByTestId("hall-of-fame").isVisible(), "legacy page: trophy room + hall of fame");
+  await page.goto(BASE + "/settings");
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-progress").click()]);
+  const file = `${SHOTS}/progress-export.json`; await dl.saveAs(file);
+  assert(JSON.parse(fs.readFileSync(file, "utf8")).format === "legends-lab-progress", "progress exported as JSON");
+  await page.getByTestId("import-file").setInputFiles(file);
+  await page.getByTestId("import-confirm").waitFor();
+  await page.getByTestId("import-merge").click();
+  assert((await page.getByTestId("io-msg").innerText()).includes("combinado"), "progress imported (merge, no duplicates)");
+  const bad = `${SHOTS}/bad.json`; fs.writeFileSync(bad, "{not json");
+  await page.getByTestId("import-file").setInputFiles(bad);
+  await page.locator('[data-testid="io-msg"]', { hasText: "no es un JSON" }).waitFor({ timeout: 5000 });
+  assert(true, "invalid import file rejected");
+  await page.goto(BASE + "/logros"); await page.reload();
+  assert((await page.getByTestId("ach-unlocked").innerText()) === unlocked, "achievements persist after reload and re-import");
 }
 
 async function mobileFootball() {
-  const m = await browser.newContext({ ...createRequire(import.meta.url)("playwright").devices["iPhone 13"] });
-  await m.addInitScript(() => localStorage.setItem("ll:settings:v1", JSON.stringify({ reducedMotion: true, fastAnimations: true })));
-  const p = await m.newPage();
-  await p.goto(BASE + "/football");
-  await p.getByTestId("fb-start").click();
-  if (await p.getByTestId("fb-spin-btn").isVisible()) await p.getByTestId("fb-spin-btn").click();
-  await p.getByTestId("fb-drawer").waitFor();
-  const sw = await p.evaluate(() => document.documentElement.scrollWidth);
-  assert(sw <= 391, `football draft: no horizontal scroll on iPhone (scrollWidth ${sw})`);
-  const box = await p.getByTestId("fb-candidate-open").first().boundingBox();
-  assert(box && box.y + box.height <= 844, "first candidate visible above the fold on iPhone");
-  await p.getByTestId("fb-candidate-open").first().click();
-  const pick = p.locator('[data-testid="fb-player-sheet"] button[data-testid^="fb-pick-"]').first();
-  await pick.waitFor();
-  await pick.scrollIntoViewIfNeeded();
-  assert(await pick.isVisible(), "ELEGIR reachable inside the sheet on iPhone");
-  await p.screenshot({ path: `${SHOTS}/mobile-football-sheet.png` });
-  await m.close();
+  for (const [w, h] of [[375, 812], [390, 844], [430, 932]]) {
+    const m = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await m.addInitScript(() => localStorage.setItem("ll:settings:v1", JSON.stringify({ reducedMotion: true, fastAnimations: true })));
+    const p = await m.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(BASE + "/football");
+    await p.getByTestId("fb-start").click();
+    if (await p.getByTestId("fb-spin-btn").isVisible()) await p.getByTestId("fb-spin-btn").click();
+    await p.getByTestId("fb-drawer").waitFor();
+    const sw = await p.evaluate(() => document.documentElement.scrollWidth);
+    assert(sw <= w + 1, `${w}×${h} football draft: no horizontal scroll (scrollWidth ${sw})`);
+    const bar = await p.getByTestId("action-bar").boundingBox(), drawer = await p.getByTestId("fb-drawer").boundingBox();
+    assert(bar && drawer && drawer.y + drawer.height <= bar.y + 1 && bar.y + bar.height <= h + 1, `${w}×${h}: action bar visible and not covering the candidates`);
+    const box = await p.getByTestId("fb-candidate-open").first().boundingBox();
+    assert(box && box.y + box.height <= bar.y, `${w}×${h}: first candidate visible above the action bar`);
+    await p.getByTestId("act-chem").click();
+    assert((await p.getByTestId("pitch").getAttribute("data-chem-mode")) === "on", `${w}×${h}: QUÍMICA action toggles chemistry mode`);
+    await p.getByTestId("fb-candidate-open").first().click();
+    const pick = p.locator('[data-testid="fb-player-sheet"] button[data-testid^="fb-pick-"]').first();
+    await pick.waitFor(); await pick.scrollIntoViewIfNeeded();
+    assert(await pick.isVisible(), `${w}×${h}: ELEGIR reachable inside the sheet`);
+    if (w === 390) await p.screenshot({ path: `${SHOTS}/mobile-football-sheet.png` });
+    await pick.click();
+    for (const path of ["/", "/nba", "/legado", "/logros", "/settings", "/history"]) {
+      await p.goto(BASE + path);
+      const sw2 = await p.evaluate(() => document.documentElement.scrollWidth);
+      assert(sw2 <= w + 1, `${w}px ${path}: no horizontal scroll (${sw2})`);
+    }
+    await m.close();
+  }
 }
 
 try {

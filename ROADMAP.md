@@ -21,6 +21,8 @@ _Última actualización: 2026-11-06_
 
 - [x] 0.4.1–0.4.2: Historical Roulette con química ampliada (idioma/estilo/continente, +1 extra máx.) y peso 0.7 (FUT intacto).
 
+- [x] V4 (0.5.0): química explicable, nombres compuestos, comparador, tácticas, premios, logros, legado, finales, exportar/importar, español centralizado, logo LL, barra móvil.
+
 ## Pendiente (prioridad)
 1. Verificar medias por partido NBA (PPG/RPG…) con una fuente con licencia (538 no las incluye; BALLDONTLIE de pago). 
 1b. **Verificación de datos con API**: ejecutar `scripts/import-nba.ts` con clave y plan adecuado; revisar diffs; marcar filas `api-verified`.
@@ -39,6 +41,9 @@ _Última actualización: 2026-11-06_
 - Calendario 2026/27: plantilla aproximada (fechas plausibles, no oficiales).
 - Desempates UCL más allá de victorias fuera usan rating como proxy del coeficiente.
 - Estadísticas individuales de fútbol: simulación estimada (no datos reales); sustitutos agregados en "Banquillo".
+- Premios de fútbol: solo del XI propio (no hay estadísticas individuales de rivales); sin premio de jugador joven (faltan fechas de nacimiento).
+- Goles rivales sin autoría individual en las crónicas de finales.
+- Safari iOS real no probado (solo emulación de viewport en Chromium).
 - `npm run lint` no configurado (ESLint no instalado).
 
 ## Dependencias externas / bloqueos

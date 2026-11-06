@@ -6,6 +6,7 @@
  */
 import { KEYS, load, save, type HistoryEntry } from "@/lib/storage";
 import { unlockNew, type AchDef } from "./achievements";
+import { OUTCOME_LABEL } from "@/features/nba-simulation/engine";
 import { emptyProgress, PROGRESS_VERSION, type DraftRec, type FbSeasonRec, type NbaSeasonRec, type Progress, type SeasonRec } from "./types";
 
 export const PROGRESS_KEY = "ll:progress:v1";
@@ -28,11 +29,12 @@ export function legacyFromHistory(h: HistoryEntry): SeasonRec | null {
     } satisfies FbSeasonRec;
   }
   if (h.game === "nba" && h.nba?.record) {
-    const n = h.nba, label = (n.playoff ?? "").toLowerCase();
-    const outcome = label.includes("campe") ? "champion" : label.includes("final") && !label.includes("conferencia") ? "finals" : "missed";
+    const n = h.nba;
+    const outcome = (Object.entries(OUTCOME_LABEL).find(([, l]) => l === n.playoff)?.[0] ?? ((n.playoff ?? "").toLowerCase().includes("campe") ? "champion" : "missed")) as string;
+    const order = ["missed", "first-round", "conf-semis", "conf-finals", "finals", "champion"];
     return {
       kind: "nba", id: `nba:${n.seed}:${n.draftSeed}`, date: h.date, difficulty: n.difficulty, draftSeed: n.draftSeed, seed: n.seed, teamName: h.detail.split(" · ")[0] ?? "",
-      wins: n.record!.wins, losses: n.record!.losses, outcome, champion: outcome === "champion", seriesWon: 0, poW: 0, poL: 99, expectedWins: 99,
+      wins: n.record!.wins, losses: n.record!.losses, outcome, champion: outcome === "champion", seriesWon: Math.max(0, order.indexOf(outcome) - 1), poW: 0, poL: 99, expectedWins: 99,
       chemistry: n.chemistry, teamOvr: n.teamOvr, offense: 0, defense: 0, playmaking: 0, legends: 0, longestStreak: 0, homeW: 0, homeL: 99, finalsGame7Win: false,
       players: [], awards: {}, legacy: true,
     } satisfies NbaSeasonRec;

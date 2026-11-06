@@ -122,3 +122,8 @@ Cada iteración i ejecuta `simulateRest(createSeason(seed#fbmc i))`: el mismo mo
 - `lib/ratings/football.ts`: `chemistryLinks` (vínculos club/nación/liga) y `previewFbPick` (antes/después) sobre `computeChemistry`.
 - Identidad NBA: `lib/core/identity.ts`; guardada en el draft y en `NbaTeamSnapshot`; nunca entra en semillas.
 - Compatibilidad: temporadas sin `squad`/`detail` muestran aviso; entradas de historial sin snapshot muestran "Partida antigua".
+
+## V4 — progreso, logros y tácticas
+- Motores intactos salvo la táctica del usuario (offsets ATT/DEF + fatiga en `season.ts`; Equilibrado no cambia nada). Logros, premios y récords son capas de lectura: no consumen RNG ni alteran resultados.
+- `lib/progress`: registro compacto por temporada → logros (evaluadores puros), récords, salón de la fama y sala de trofeos derivados.
+- UI nueva: `ChemWhy`, `FbPlayerSheet` (comparador), `TacticPicker`, `SeasonAwardsView`, `Finals`, `QuadrupleCelebration`, `ActionBar`, `AchievementToasts`, `TrophyIcon`, `LogoMark`; rutas `/logros` y `/legado`.
