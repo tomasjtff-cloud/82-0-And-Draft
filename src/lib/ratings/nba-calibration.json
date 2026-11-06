@@ -1,0 +1,20 @@
+{
+  "model": "RAPTOR_total ~ box features (ridge λ=2, minutes-weighted)",
+  "n": 537,
+  "r2": 0.601,
+  "rmse": 1.77,
+  "coefficients": {
+    "intercept": -4.1851,
+    "pts": 0.0718,
+    "pts2": 0.0432,
+    "reb": 0.1291,
+    "ast": 0.3915,
+    "stl": 1.3872,
+    "blk": 0.1351,
+    "effVol": 0.1787,
+    "defRep": 0.6881,
+    "threes": 0.579,
+    "bigReb": 0.0212
+  },
+  "generatedAt": "2026-11-06"
+}

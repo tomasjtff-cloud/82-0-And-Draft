@@ -55,6 +55,8 @@ export interface NbaRatings {
   shooting: number;
   versatility: number;
   eraAdjustment: number; // multiplicative factor applied to counting stats (shown as %)
+  /** estimated impact, points per 100 possessions above average (RAPTOR scale) */
+  impact: number;
   /** which components rely on estimates because stats were missing */
   estimated: string[];
 }
@@ -81,6 +83,13 @@ export interface NbaDraftState {
   rngState: [number, number, number, number];
 }
 
+/** One box-score line of the user's team (starters by position, plus the generic bench). */
+export interface BoxLine {
+  key: NbaPos | "BENCH";
+  min: number; pts: number; reb: number; ast: number; stl: number; blk: number;
+  fgm: number; fga: number; tpm: number; tpa: number; ftm: number; fta: number;
+}
+
 export interface NbaGameResult {
   game: number;
   opponent: string;
@@ -91,6 +100,24 @@ export interface NbaGameResult {
   win: boolean;
   expectedMargin: number;
   winProb: number;
+  overtimes?: number;
+  box?: BoxLine[];
+}
+
+export interface StandingEntry { team: string; conference: "East" | "West"; w: number; l: number; pf: number; pa: number; seed?: number }
+
+export interface PlayoffGame { game: number; home: string; away: string; homeScore: number; awayScore: number; overtimes: number; box?: BoxLine[] }
+export interface PlayoffSeries {
+  id: string; round: 1 | 2 | 3 | 4; conference: "East" | "West" | "Finals";
+  high: string; low: string; highSeed: number; lowSeed: number;
+  winsHigh: number; winsLow: number; winner: string; games: PlayoffGame[];
+}
+export type PlayoffOutcome = "missed" | "first-round" | "conf-semis" | "conf-finals" | "finals" | "champion";
+
+export interface PlayerTotals {
+  key: NbaPos | "BENCH"; name: string; gp: number;
+  min: number; pts: number; reb: number; ast: number; stl: number; blk: number;
+  fgm: number; fga: number; tpm: number; tpa: number; ftm: number; fta: number;
 }
 
 export interface NbaSeasonResult {
@@ -102,4 +129,7 @@ export interface NbaSeasonResult {
   longestWinStreak: number;
   avgMargin: number;
   teamNet: number;
+  standings?: StandingEntry[];
+  playoffs?: { series: PlayoffSeries[]; outcome: PlayoffOutcome; champion: string; userSeed: number | null };
+  stats?: { regular: PlayerTotals[]; playoffs: PlayerTotals[] };
 }

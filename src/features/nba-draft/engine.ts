@@ -21,8 +21,26 @@ for (const c of ALL_CARDS) {
   if (!POOL.has(k)) POOL.set(k, []);
   POOL.get(k)!.push(c);
 }
+
+/**
+ * Best eligible season of a player inside one (franchise, decade) combo.
+ * Criterion (documented): highest OVR v2 → highest estimated impact → most games → most recent.
+ */
+export function bestVersion(versions: NbaCard[]): NbaCard {
+  return [...versions].sort((a, b) => b.ratings.overall - a.ratings.overall || b.ratings.impact - a.ratings.impact || (b.gp ?? 0) - (a.gp ?? 0) || b.startYear - a.startYear)[0];
+}
+
+/** One card per player for the combo (their best season), strongest first. */
 export function poolFor(spin: NbaSpin): NbaCard[] {
-  return (POOL.get(`${spin.franchiseId}|${spin.decade}`) ?? []).slice().sort((a, b) => b.ratings.overall - a.ratings.overall);
+  const all = POOL.get(`${spin.franchiseId}|${spin.decade}`) ?? [];
+  const byPlayer = new Map<string, NbaCard[]>();
+  for (const c of all) { if (!byPlayer.has(c.playerId)) byPlayer.set(c.playerId, []); byPlayer.get(c.playerId)!.push(c); }
+  return [...byPlayer.values()].map(bestVersion).sort((a, b) => b.ratings.overall - a.ratings.overall);
+}
+
+/** Every season of a player inside the combo (for the optional "otras temporadas" view). */
+export function versionsFor(spin: NbaSpin, playerId: string): NbaCard[] {
+  return (POOL.get(`${spin.franchiseId}|${spin.decade}`) ?? []).filter((c) => c.playerId === playerId).sort((a, b) => a.startYear - b.startYear);
 }
 
 export function openPositions(state: Pick<NbaDraftState, "lineup">): NbaPos[] {
@@ -117,9 +135,11 @@ export function respinEra(state: NbaDraftState): Result<NbaDraftState> {
 
 export function pick(state: NbaDraftState, cardId: string, pos: NbaPos): Result<NbaDraftState> {
   if (isComplete(state)) return { ok: false, error: "El quinteto ya está completo." };
-  if (!state.options.includes(cardId)) return { ok: false, error: "Ese jugador no está disponible en esta ronda." };
   const card = CARD_BY_ID[cardId];
   if (!card) return { ok: false, error: "Jugador desconocido." };
+  // Any season of an offered player inside the current combo is allowed (best season is the default).
+  const offered = state.options.some((id) => CARD_BY_ID[id]?.playerId === card.playerId);
+  if (!offered || !state.spin || card.franchiseId !== state.spin.franchiseId || card.decade !== state.spin.decade) return { ok: false, error: "Ese jugador no está disponible en esta ronda." };
   if (state.lineup[pos]) return { ok: false, error: `La posición ${pos} ya está ocupada.` };
   if (!card.positions.includes(pos)) return { ok: false, error: `${card.name} no puede jugar de ${pos}.` };
   if (usedPlayerIds(state).has(card.playerId)) return { ok: false, error: `${card.name} ya está en tu quinteto.` };

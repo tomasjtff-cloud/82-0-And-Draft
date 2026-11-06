@@ -1,6 +1,8 @@
 import type { NbaCard, NbaPlayerSeason, NbaPos, NbaRatings } from "@/types/nba";
 import { leagueContext, MODERN } from "./nba-context";
 import { nbaVerification } from "@/lib/data/verification";
+import { designRow, nbaFeatures } from "./nba-features";
+import calibration from "./nba-calibration.json";
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 const to100 = (x: number) => Math.round(clamp(x, 25, 99));
@@ -53,35 +55,62 @@ function shootingScore(p: NbaPlayerSeason, n: Normalized): number {
   return 38 + threeQ + (ft - 0.75) * 70;
 }
 
+/* ───────── Rating model v2 (see ARCHITECTURE.md → "NBA ratings v2") ─────────
+ * 1. Impact: box-score features → linear model fitted against FiveThirtyEight
+ *    RAPTOR (scripts/calibrate-nba.ts). Predictions are variance-matched
+ *    (÷√R²) so they live on the same scale as real RAPTOR, then blended with
+ *    the season's real RAPTOR when it exists (weight 0.5·min(1, MP/2500)).
+ * 2. Impact (pts/100 above average) → OVR via documented knots.
+ * 3. Production index (volume/box line) → OVR, so big statistical seasons read
+ *    as a video game would. Final OVR = 0.62·impact + 0.38·production.
+ */
+const BETA = Object.values(calibration.coefficients) as number[];
+const R2 = calibration.r2 || 0.6;
+const IMPACT_MEAN = 3.0;
+const KNOTS: [number, number][] = [[-3, 64], [0, 75], [2, 81], [4, 86], [6, 91], [8, 94.5], [10, 96.8], [12, 98.5], [14, 99]];
+export function impactToOvr(I: number): number {
+  if (I <= KNOTS[0][0]) return KNOTS[0][1] + (I - KNOTS[0][0]) * 2.5;
+  for (let i = 1; i < KNOTS.length; i++) {
+    if (I <= KNOTS[i][0]) { const [x0, y0] = KNOTS[i - 1], [x1, y1] = KNOTS[i]; return y0 + ((y1 - y0) * (I - x0)) / (x1 - x0); }
+  }
+  return 99;
+}
+export function impactEstimate(p: NbaPlayerSeason): { impact: number; predicted: number; raptor: number | null } {
+  const f = nbaFeatures(p);
+  const raw = designRow(f).reduce((s, v, i) => s + v * (BETA[i] ?? 0), 0);
+  const predicted = IMPACT_MEAN + (raw - IMPACT_MEAN) / Math.sqrt(R2);
+  const v = nbaVerification(p.id);
+  if (v.raptor && v.raptor.mp >= 500) {
+    const w = 0.5 * Math.min(1, v.raptor.mp / 2500);
+    return { impact: w * v.raptor.raptorTotal + (1 - w) * predicted, predicted, raptor: v.raptor.raptorTotal };
+  }
+  return { impact: predicted, predicted, raptor: null };
+}
+
 export function rateNbaPlayer(p: NbaPlayerSeason): NbaRatings {
   const n = normalize(p);
+  const f = nbaFeatures(p);
   const ptsTerm = n.pts <= 30 ? 0.9 * n.pts : 27 + 0.5 * (n.pts - 30);
-  const vol = Math.min(1, n.pts / 20);
-  const effTerm = n.relFg * 60 * vol;
-  const index =
-    ptsTerm + 0.55 * n.reb + 1.4 * n.ast + 2.0 * n.stl + 1.4 * n.blk + effTerm + p.defRep * 2.0 +
-    Math.max(0, shootingScore(p, n) - 60) * 0.14;
+  const effTerm = f.relEfg * 60 * f.vol;
+  const shoot = shootingScore(p, n);
+  const prodIndex = ptsTerm + 0.55 * n.reb + 1.4 * n.ast + 2.0 * n.stl + 1.4 * n.blk + effTerm + p.defRep * 2.0;
+  const { impact } = impactEstimate(p);
+  const overall = clamp(Math.round(0.62 * impactToOvr(impact) + 0.38 * Math.min(99, 47 + 0.85 * prodIndex)), 55, 99);
 
-  const offense = 30 + ptsTerm * 1.55 + n.ast * 1.6 + effTerm * 1.2 + Math.max(0, shootingScore(p, n) - 55) * 0.15;
+  const offense = 30 + ptsTerm * 1.55 + n.ast * 1.6 + effTerm * 1.2 + Math.max(0, shoot - 55) * 0.15;
   const defense = 30 + n.stl * 9 + n.blk * 7 + n.reb * 1.1 + p.defRep * 9;
   const playmaking = 30 + n.ast * 6.2;
   const rebounding = 28 + n.reb * 5.2;
   const rimProtection = 25 + n.blk * 20 + (p.positions.includes("C") ? 8 : 0);
-  const shooting = shootingScore(p, n);
-  const comps = [offense, defense, playmaking, rebounding, shooting];
+  const comps = [offense, defense, playmaking, rebounding, shoot];
   const versatility = 35 + comps.filter((c) => c >= 62).length * 10 + (p.positions.length - 1) * 6;
-  const overall = clamp(Math.round(43 + index * 0.85), 55, 99);
 
   return {
     overall,
-    offense: to100(offense),
-    defense: to100(defense),
-    playmaking: to100(playmaking),
-    rebounding: to100(rebounding),
-    rimProtection: to100(rimProtection),
-    shooting: to100(shooting),
-    versatility: to100(versatility),
+    offense: to100(offense), defense: to100(defense), playmaking: to100(playmaking), rebounding: to100(rebounding),
+    rimProtection: to100(rimProtection), shooting: to100(shoot), versatility: to100(versatility),
     eraAdjustment: Math.round(n.paceAdj * n.scoreEnv * 100) / 100,
+    impact: Math.round(impact * 10) / 10,
     estimated: n.estimated,
   };
 }
@@ -94,6 +123,10 @@ export function toCard(p: NbaPlayerSeason): NbaCard {
 }
 
 /* ───────────── Team evaluation ───────────── */
+
+/** Team model calibration (v2): avg OVR 79 ≈ league-average team (net 0). See tests/unit/nba-calibration.test.ts. */
+export const TEAM_OVR_PIVOT = 79;
+export const TEAM_OVR_SLOPE = 1.0;
 
 export interface NbaTeamEval {
   overall: number;
@@ -155,7 +188,7 @@ export function evaluateNbaTeam(lineup: Partial<Record<NbaPos, NbaCard>>, fitSen
   const fitAdjust = Math.round(fit * fitSensitivity * 10) / 10;
   const chemistry = Math.round(clamp(70 + fit * 6 + (shooters >= 3 ? 6 : 0), 0, 100));
 
-  const base = (overall - 71.5) * 0.83 + (offense - 80) * 0.08 + (defense - 65) * 0.08;
+  const base = (overall - TEAM_OVR_PIVOT) * TEAM_OVR_SLOPE + (offense - 80) * 0.06 + (defense - 65) * 0.06;
   const net = Math.round((base + fitAdjust) * 10) / 10;
 
   const labeled: [string, number][] = [
