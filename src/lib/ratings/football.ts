@@ -102,53 +102,101 @@ export const STYLE_FAMILY_DESC: Record<StyleFamily, string> = {
 const continentOf = (n: string) => CONTINENT_OF[n] ?? n;
 const languagesOf = (n: string) => LANGUAGES_OF[n] ?? [n];
 
+/* Thresholds (counts include the player himself). Single source of truth for engine + UI. */
+export const CHEM_THRESHOLDS = { club: [2, 4, 6], nation: [2, 4, 7], league: [3, 5, 8] } as const;
+export type ChemGroupKind = keyof typeof CHEM_THRESHOLDS;
+export interface ChemGroup {
+  kind: ChemGroupKind; key: string; count: number; thresholds: readonly number[];
+  points: number; next: number | null; /** other slots in the same group (incl. out-of-position players, who still count for teammates) */ mates: string[];
+}
+export interface ChemExtra { kind: "language" | "style" | "continent"; key: string; count: number; min: number; met: boolean; mates: string[] }
+export interface SlotChem {
+  slotId: string; cardId: string; outOfPosition: boolean; groups: ChemGroup[]; extras: ChemExtra[];
+  extraPoints: number; legend: boolean; captain: boolean; raw: number; effective: number; why: string[];
+}
+export interface ChemBreakdown { total: number; extended: boolean; slots: Record<string, SlotChem> }
+
+/**
+ * Full, explainable chemistry. RULES (documented in CHEMISTRY.md):
+ * - group counts include every placed player, also those out of position (they get 0 themselves but still count for teammates);
+ * - club 2/4/6, nation 2/4/7, league 3/5/8 → +1/+2/+3 each;
+ * - Roulette v2 (extended): +1 extra max if language ≥3, style family ≥4 or continent ≥4;
+ * - legends (OVR ≥ 90) in position have at least 1; captain +1; individual cap 3 (team 33).
+ */
+export function chemistryBreakdown(
+  formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string, captainId: string | null, extended = false,
+): ChemBreakdown {
+  const placed = formation.slots.map((s) => ({ slot: s, c: lineup[s.id] })).filter((x) => !!x.c) as { slot: Formation["slots"][number]; c: FbPlayerSeason }[];
+  const keyOf: Record<ChemGroupKind, (c: FbPlayerSeason) => string> = { club: (c) => c.clubId, nation: (c) => c.nation, league: (c) => leagueOf(c.clubId) };
+  const members = (f: (c: FbPlayerSeason) => string[]) => {
+    const m = new Map<string, string[]>();
+    for (const { slot, c } of placed) for (const k of f(c)) m.set(k, [...(m.get(k) ?? []), slot.id]);
+    return m;
+  };
+  const groups = { club: members((c) => [keyOf.club(c)]), nation: members((c) => [keyOf.nation(c)]), league: members((c) => [keyOf.league(c)]) };
+  const langs = members((c) => languagesOf(c.nation)), fams = members((c) => [FAMILY[c.style]]), conts = members((c) => [continentOf(c.nation)]);
+  const lvl = (n: number, t: readonly number[]) => (n >= t[2] ? 3 : n >= t[1] ? 2 : n >= t[0] ? 1 : 0);
+  const slots: Record<string, SlotChem> = {};
+  let total = 0;
+  for (const { slot, c } of placed) {
+    const outOfPosition = slotFit(c, slot.pos) < 0.9;
+    const gs: ChemGroup[] = (["club", "nation", "league"] as const).map((kind) => {
+      const key = keyOf[kind](c), all = groups[kind].get(key)!, t = CHEM_THRESHOLDS[kind];
+      const points = lvl(all.length, t);
+      return { kind, key, count: all.length, thresholds: t, points, next: t.find((x) => x > all.length) ?? null, mates: all.filter((x) => x !== slot.id) };
+    });
+    const extras: ChemExtra[] = [];
+    if (extended) {
+      const lang = languagesOf(c.nation).map((l) => ({ l, m: langs.get(l)! })).sort((a, b) => b.m.length - a.m.length)[0];
+      const fam = fams.get(FAMILY[c.style])!, cont = conts.get(continentOf(c.nation))!;
+      extras.push({ kind: "language", key: lang.l, count: lang.m.length, min: EXT_MIN.language, met: lang.m.length >= EXT_MIN.language, mates: lang.m.filter((x) => x !== slot.id) });
+      extras.push({ kind: "style", key: FAMILY[c.style], count: fam.length, min: EXT_MIN.style, met: fam.length >= EXT_MIN.style, mates: fam.filter((x) => x !== slot.id) });
+      extras.push({ kind: "continent", key: continentOf(c.nation), count: cont.length, min: EXT_MIN.continent, met: cont.length >= EXT_MIN.continent, mates: cont.filter((x) => x !== slot.id) });
+    }
+    const why: string[] = [];
+    let raw = 0, extraPoints = 0, legend = false;
+    const captain = !!captainId && c.id === captainId;
+    if (!outOfPosition) {
+      for (const g of gs) if (g.points) why.push(`${g.kind === "club" ? "club" : g.kind === "nation" ? "nación" : "liga"} +${g.points}`);
+      raw = gs.reduce((a, g) => a + g.points, 0);
+      const met = extras.filter((e) => e.met);
+      if (met.length) { extraPoints = 1; raw += 1; why.push(`extra +1 (${met.map((e) => `${e.kind === "language" ? "idioma" : e.kind === "style" ? "estilo" : "continente"} ${e.key}`).join(", ")})`); }
+      // Legends are never isolated: elite players keep a base of 1 (cross-era friendly).
+      if (c.ovr >= 90 && raw < 1) { raw = 1; legend = true; why.push("leyenda +1"); }
+      if (captain) { raw += 1; why.push("capitán +1"); }
+    } else why.push("fuera de posición: 0");
+    const effective = Math.min(3, raw);
+    slots[slot.id] = { slotId: slot.id, cardId: c.id, outOfPosition, groups: gs, extras, extraPoints, legend, captain, raw, effective, why };
+    total += effective;
+  }
+  return { total, extended, slots };
+}
+
+/** Compact result used by the engine; derived from chemistryBreakdown (same numbers, by construction). */
 export function computeChemistry(
   formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string, captainId: string | null, extended = false,
 ): ChemResult {
-  const placed = formation.slots.map((s) => ({ slot: s, c: lineup[s.id] })).filter((x) => !!x.c) as { slot: Formation["slots"][number]; c: FbPlayerSeason }[];
-  const count = (key: (c: FbPlayerSeason) => string) => {
-    const m = new Map<string, number>();
-    for (const { c } of placed) m.set(key(c), (m.get(key(c)) ?? 0) + 1);
-    return m;
-  };
-  const clubs = count((c) => c.clubId), nations = count((c) => c.nation), leagues = count((c) => leagueOf(c.clubId));
-  const continents = count((c) => continentOf(c.nation)), families = count((c) => FAMILY[c.style]);
-  const langs = new Map<string, number>();
-  for (const { c } of placed) for (const l of languagesOf(c.nation)) langs.set(l, (langs.get(l) ?? 0) + 1);
-  const lvl = (n: number, t: [number, number, number]) => (n >= t[2] ? 3 : n >= t[1] ? 2 : n >= t[0] ? 1 : 0);
-  const perSlot: Record<string, number> = {};
-  const links: Record<string, string[]> = {};
-  let total = 0;
-  for (const { slot, c } of placed) {
-    const fit = slotFit(c, slot.pos);
-    const why: string[] = [];
-    let pts = 0;
-    if (fit >= 0.9) {
-      const cl = lvl(clubs.get(c.clubId)!, [2, 4, 6]);
-      const na = lvl(nations.get(c.nation)!, [2, 4, 7]);
-      const le = lvl(leagues.get(leagueOf(c.clubId))!, [3, 5, 8]);
-      if (cl) why.push(`club +${cl}`); if (na) why.push(`nación +${na}`); if (le) why.push(`liga +${le}`);
-      pts = cl + na + le;
-      if (extended) {
-        // Extra links (Roulette only): any of them gives +1, never more than +1 per player.
-        const bestLang = languagesOf(c.nation).reduce((b, l) => ((langs.get(l) ?? 0) > b.n ? { l, n: langs.get(l)! } : b), { l: "", n: 0 });
-        const extra: string[] = [];
-        if (bestLang.n >= EXT_MIN.language) extra.push(`idioma ${bestLang.l}`);
-        if (families.get(FAMILY[c.style])! >= EXT_MIN.style) extra.push(`estilo ${FAMILY[c.style]}`);
-        if (continents.get(continentOf(c.nation))! >= EXT_MIN.continent) extra.push(`continente ${continentOf(c.nation)}`);
-        if (extra.length) { pts += 1; why.push(`extra +1 (${extra.join(", ")})`); }
-      }
-      // Legends are never isolated: elite players keep a base of 1 (cross-era friendly).
-      if (c.ovr >= 90 && pts < 1) { pts = 1; why.push("leyenda +1"); }
-      if (captainId && c.id === captainId) { pts += 1; why.push("capitán +1"); }
-    } else {
-      why.push("fuera de posición: 0");
-    }
-    perSlot[slot.id] = Math.min(3, pts);
-    links[slot.id] = why;
-    total += perSlot[slot.id];
+  const b = chemistryBreakdown(formation, lineup, leagueOf, captainId, extended);
+  const perSlot: Record<string, number> = {}, links: Record<string, string[]> = {};
+  for (const s of Object.values(b.slots)) { perSlot[s.slotId] = s.effective; links[s.slotId] = s.why; }
+  return { total: b.total, perSlot, links };
+}
+
+/** Human tips: which thresholds are closest for this player (only when below 3). */
+export function chemTips(s: SlotChem): string[] {
+  if (s.outOfPosition) return ["Colócalo en su posición natural: fuera de posición su química individual es 0."];
+  if (s.effective >= 3) return [];
+  const tips: string[] = [];
+  for (const g of [...s.groups].filter((g) => g.next !== null).sort((a, b) => a.next! - a.count - (b.next! - b.count))) {
+    const need = g.next! - g.count;
+    tips.push(`${need} jugador${need > 1 ? "es" : ""} más con su misma ${g.kind === "club" ? "club" : g.kind === "nation" ? "nacionalidad" : "liga"} (${g.count}/${g.next}) → +1.`.replace("misma club", "mismo club"));
   }
-  return { total, perSlot, links };
+  if (s.extras.length && !s.extraPoints) {
+    const e = [...s.extras].sort((a, b) => a.min - a.count - (b.min - b.count))[0];
+    const need = e.min - e.count;
+    tips.push(`${need} más con su ${e.kind === "language" ? "idioma" : e.kind === "style" ? "estilo" : "continente"} (${e.count}/${e.min}) → extra +1.`);
+  }
+  return tips.slice(0, 3);
 }
 
 /* ───────── Team ratings ───────── */

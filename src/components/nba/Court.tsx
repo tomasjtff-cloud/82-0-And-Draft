@@ -1,5 +1,6 @@
 "use client";
 import { motion, AnimatePresence } from "motion/react";
+import { shortName } from "@/lib/core/names";
 import type { NbaCard, NbaPos } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
 import { FRANCHISE_BY_ID } from "@/lib/data/nba/franchises";
@@ -37,7 +38,7 @@ export function Court({ lineup, selected, onSlotClick, highlight = [] }: { lineu
                 <motion.div key={c.id} initial={{ scale: 0.3, opacity: 0, y: -20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.3, opacity: 0 }}
                   className={`flex flex-col items-center ${selected === p ? "drop-shadow-[0_0_10px_rgba(255,255,255,.9)]" : "drop-shadow-lg"}`}>
                   <Jersey primary={fr.colors[0]} secondary={fr.colors[1]} label={String(c.ratings.overall)} size={46} />
-                  <span className="mt-0.5 max-w-[84px] truncate rounded bg-black/75 px-1.5 py-0.5 font-cond text-[11px] font-bold uppercase leading-tight sm:max-w-[110px] sm:text-xs">{c.name.split(" ").slice(-1)[0]}</span>
+                  <span className="mt-0.5 max-w-[84px] truncate rounded bg-black/75 px-1.5 py-0.5 font-cond text-[11px] font-bold uppercase leading-tight sm:max-w-[110px] sm:text-xs">{shortName(c.name)}</span>
                   <span className="font-cond text-[10px] font-bold text-nba-2">{p}</span>
                 </motion.div>
               ) : (

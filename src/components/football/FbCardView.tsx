@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "motion/react";
+import { shortName } from "@/lib/core/names";
 import { HIST_CLUB_BY_ID } from "@/lib/data/football/clubs";
 import { rarityOf, STYLE_LABEL } from "@/lib/ratings/football";
 import type { FbPlayerSeason } from "@/types/football";
@@ -77,7 +78,9 @@ export function FbMiniCard({ card, pos, chem, fit, selected, captain }: { card: 
           <span className="font-display text-lg leading-none">{card.ovr}</span>
           <span className="font-cond text-[11px] font-extrabold">{pos}</span>
         </div>
-        <div className="truncate font-cond text-[11px] font-extrabold uppercase leading-tight">{captain ? "© " : ""}{card.name.split(" ").slice(-1)[0]}</div>
+        {(() => { const sn = shortName(card.name); return (
+          <div className={`line-clamp-2 break-words font-cond font-extrabold uppercase leading-[1.05] ${sn.length > 11 ? "text-[9.5px]" : "text-[11px]"}`} title={card.name}>{captain ? "© " : ""}{sn}</div>
+        ); })()}
         <div className="mt-0.5 flex gap-0.5" aria-label={`Química ${chem}`}>
           {[0, 1, 2].map((i) => <span key={i} className={`h-1 flex-1 rounded-full ${i < chem ? "bg-[#0b6b3a]" : "bg-black/20"}`} />)}
         </div>

@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { shortName } from "@/lib/core/names";
 import { Sheet } from "@/components/common/Sheet";
 import type { CompId, Match } from "@/types/football";
 import type { SeasonState } from "@/features/football-simulation/season";
@@ -97,7 +98,7 @@ export function FbMatchList({ s }: { s: SeasonState }) {
       <ul className="panel divide-y divide-line">
         {ms.map((m) => {
           const r = res(m);
-          const scorers = m.detail?.goals.map((g) => nameOfKey(s, g.scorer).split(" ").pop()).join(", ");
+          const scorers = m.detail?.goals.map((g) => shortName(nameOfKey(s, g.scorer))).join(", ");
           return (
             <li key={m.id}>
               <button className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/[.03]" onClick={() => setOpen(m)} data-testid="fb-match-row">

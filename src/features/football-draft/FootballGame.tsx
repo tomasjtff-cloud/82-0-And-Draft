@@ -7,7 +7,7 @@ import { randomSeed } from "@/lib/core/rng";
 import { FORMATIONS, FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUBS, HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { FANTASY_ID, PL_CLUBS } from "@/lib/data/football/world";
-import { chemRulesFor, chemistryEffect, type ChemRules, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
+import { chemRulesFor, chemistryBreakdown, chemistryEffect, type ChemRules, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
 import { addHistory, KEYS, load, remove, save } from "@/lib/storage";
 import { animMs, useSettings } from "@/hooks/useSettings";
 import type { DraftMode, FbDraftState, FbPlayerSeason } from "@/types/football";
@@ -22,6 +22,8 @@ import { DifficultySelector } from "@/components/common/DifficultySelector";
 import { Reel } from "@/components/common/Reel";
 import { FbCandidateRow, FbCardView } from "@/components/football/FbCardView";
 import { FbPlayerSheet } from "@/components/football/FbPlayerSheet";
+import { ChemWhy } from "@/components/football/ChemWhy";
+import { Sheet } from "@/components/common/Sheet";
 import { XiButton, XiModal, type XiSource } from "@/components/football/XiModal";
 import { ChemLegend, FormationPreview, Pitch } from "@/components/football/Pitch";
 import { SeasonView } from "@/components/football/SeasonView";
@@ -40,7 +42,8 @@ export function FootballGame() {
   const [error, setError] = useState<string | null>(null);
   const [captainPick, setCaptainPick] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [inspect, setInspect] = useState<string | null>(null);
+  const [focusSlot, setFocusSlot] = useState<string | null>(null);
+  const [whyOpen, setWhyOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showXi, setShowXi] = useState(false);
@@ -69,7 +72,8 @@ export function FootballGame() {
     return out;
   }, [draft]);
   const extended = session.phase === "season" && session.season ? !!session.rules?.extended : chemRulesFor(draft?.mode ?? config.mode).extended;
-  const chem = useMemo(() => computeChemistry(formation, lineupCards, leagueOf, draft?.captainId ?? null, extended), [formation, lineupCards, draft, extended]);
+  const breakdown = useMemo(() => chemistryBreakdown(formation, lineupCards, leagueOf, draft?.captainId ?? null, extended), [formation, lineupCards, draft, extended]);
+  const chem = useMemo(() => ({ total: breakdown.total, perSlot: Object.fromEntries(Object.values(breakdown.slots).map((x) => [x.slotId, x.effective])) as Record<string, number> }), [breakdown]);
   // During a season keep the rules it was played with; old sessions without them = classic.
   const rules: ChemRules = session.phase === "season" && session.season ? (session.rules ?? { extended: false, weight: 1, version: 1 }) : chemRulesFor(draft?.mode ?? config.mode);
   const chemW = rules.weight;
@@ -120,13 +124,13 @@ export function FootballGame() {
   };
 
   const onSlotClick = (slotId: string) => {
-    if (!draft || session.phase !== "squad") { setInspect(draft?.lineup[slotId] ?? null); return; }
-    setInspect(draft.lineup[slotId] ?? null);
+    setFocusSlot(draft?.lineup[slotId] ? slotId : null);
+    if (!draft || session.phase !== "squad") return;
     if (selected && selected !== slotId) { const r = swapSlots(draft, selected, slotId); if (r.ok) set({ draft: r.state }); else setError(r.error); setSelected(null); return; }
     setSelected(selected === slotId ? null : slotId);
   };
 
-  const newDraft = () => { remove(KEYS.fbSession); setSession({ phase: "setup", config, draft: null, season: null, live: false }); setSelected(null); setInspect(null); };
+  const newDraft = () => { remove(KEYS.fbSession); setSession({ phase: "setup", config, draft: null, season: null, live: false }); setSelected(null); };
 
   /* ───────── SETUP ───────── */
   if (session.phase === "setup") {
@@ -288,8 +292,17 @@ export function FootballGame() {
             {chemMode && <ChemLegend extended={rules.extended} />}
           </div>
           <div className="mx-auto w-full max-w-md lg:max-w-none">
-            <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? selected : null} />
+            <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? (selected ?? focusSlot) : null} />
           </div>
+          {focusSlot && draft.lineup[focusSlot] && breakdown.slots[focusSlot] && (
+            <div className="panel flex items-center gap-3 p-3" data-testid="chem-focus">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-cond text-base font-bold uppercase">{FB_CARD_BY_ID[draft.lineup[focusSlot]].name}</span>
+                <span className="block text-xs text-muted">Química individual <b className="font-mono text-text">{breakdown.slots[focusSlot].effective}/3</b> · {breakdown.slots[focusSlot].why.join(" · ") || "sin vínculos activos"}</span>
+              </span>
+              <button className="btn btn-sm btn-gold shrink-0" onClick={() => setWhyOpen(true)} data-testid="chem-why-open">¿Por qué?</button>
+            </div>
+          )}
           {chemMode && <p className="text-xs text-muted">Química {chem.total}/33 → {chemistryEffect(chem.total, sens, chemW) >= 0 ? "+" : ""}{chemistryEffect(chem.total, sens, chemW)} en ataque y defensa del motor{chemW < 1 ? ` (Historical Roulette: también suman continente, idioma y estilo; la química pesa ${Math.round(chemW * 100)} %)` : ""}. Toca un jugador para ver sus vínculos.</p>}
 
           {isSquad && (
@@ -316,7 +329,7 @@ export function FootballGame() {
                 <button className="btn py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">Live season · jornada a jornada</button>
               </div>
               <FootballMonteCarloPanel user={mcUser} difficulty={config.difficulty} teamLabel={userName} />
-              {inspect && <div className="mx-auto max-w-xs"><FbCardView card={FB_CARD_BY_ID[inspect]} /></div>}
+
             </motion.section>
           )}
           <button className="btn btn-ghost btn-sm" onClick={newDraft}>Abandonar draft</button>
@@ -350,6 +363,14 @@ export function FootballGame() {
       <FbPlayerSheet card={openCard ? FB_CARD_BY_ID[openCard] : null} compareWith={compareId && compareId !== openCard ? FB_CARD_BY_ID[compareId] : null}
         formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} fitSensitivity={sens} chemWeight={chemW} extended={rules.extended}
         pickLabel={needCaptain ? "Capitán" : "Elegir"} onPick={onPickCard} onClose={() => setOpenCard(null)} />
+      <Sheet open={whyOpen && !!focusSlot && !!breakdown.slots[focusSlot ?? ""]} onClose={() => setWhyOpen(false)} title="¿Por qué tengo esta química?" testId="chem-why-sheet">
+        {focusSlot && breakdown.slots[focusSlot] && draft.lineup[focusSlot] && (
+          <div className="space-y-4">
+            <ChemWhy s={breakdown.slots[focusSlot]} card={FB_CARD_BY_ID[draft.lineup[focusSlot]]} lineup={lineupCards} />
+            <div className="mx-auto max-w-xs"><FbCardView card={FB_CARD_BY_ID[draft.lineup[focusSlot]]} /></div>
+          </div>
+        )}
+      </Sheet>
       {xiModal}
     </div>
   );

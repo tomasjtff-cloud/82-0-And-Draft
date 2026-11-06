@@ -36,3 +36,21 @@ const L: Record<string, string> = {
 };
 export const LANGUAGES_OF: Record<string, string[]> = {};
 for (const [lang, ns] of Object.entries(L)) for (const n of ns.split(" ")) (LANGUAGES_OF[n] ??= []).push(lang);
+
+/** Spanish display names (UI only). */
+export const NATION_ES: Record<string, string> = {
+  ALB: "Albania", ALG: "Argelia", ARG: "Argentina", ARM: "Armenia", AUS: "Australia", AUT: "Austria", BEL: "Bélgica", BER: "Bermudas", BFA: "Burkina Faso",
+  BIH: "Bosnia y Herzegovina", BLR: "Bielorrusia", BOL: "Bolivia", BRA: "Brasil", BUL: "Bulgaria", CAN: "Canadá", CHI: "Chile", CIV: "Costa de Marfil", CMR: "Camerún",
+  COD: "RD del Congo", COL: "Colombia", CRC: "Costa Rica", CRO: "Croacia", CZE: "Chequia", DEN: "Dinamarca", ECU: "Ecuador", EGY: "Egipto", ENG: "Inglaterra",
+  ESP: "España", FIN: "Finlandia", FRA: "Francia", GAB: "Gabón", GEO: "Georgia", GER: "Alemania", GHA: "Ghana", GRE: "Grecia", GUI: "Guinea", HON: "Honduras",
+  HUN: "Hungría", IRL: "Irlanda", IRN: "Irán", ISL: "Islandia", ITA: "Italia", JAM: "Jamaica", JPN: "Japón", KEN: "Kenia", KOR: "Corea del Sur", KOS: "Kosovo",
+  KSA: "Arabia Saudí", LBR: "Liberia", MAR: "Marruecos", MEX: "México", MLI: "Malí", MNE: "Montenegro", MOZ: "Mozambique", NED: "Países Bajos", NGA: "Nigeria",
+  NIR: "Irlanda del Norte", NOR: "Noruega", PAN: "Panamá", PAR: "Paraguay", PER: "Perú", POL: "Polonia", POR: "Portugal", ROU: "Rumania", RSA: "Sudáfrica",
+  RUS: "Rusia", SCO: "Escocia", SEN: "Senegal", SMR: "San Marino", SRB: "Serbia", SUI: "Suiza", SVK: "Eslovaquia", SVN: "Eslovenia", SWE: "Suecia", TOG: "Togo",
+  TRI: "Trinidad y Tobago", TUN: "Túnez", TUR: "Turquía", UKR: "Ucrania", URU: "Uruguay", USA: "Estados Unidos", VEN: "Venezuela", WAL: "Gales", YUG: "Yugoslavia",
+  ZAM: "Zambia", ZIM: "Zimbabue",
+};
+/** Spanish display names of the domestic leagues used by chemistry. */
+export const LEAGUE_ES: Record<string, string> = {
+  England: "Premier League / liga inglesa", Spain: "LaLiga", Italy: "Serie A", Germany: "Bundesliga", France: "Ligue 1", Netherlands: "Eredivisie", Portugal: "Liga portuguesa",
+};

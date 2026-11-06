@@ -1,11 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
+import { ChemWhy } from "./ChemWhy";
 import { Sheet } from "@/components/common/Sheet";
 import type { FbPlayerSeason } from "@/types/football";
 import { FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { DIFFICULTY_PARAMS, type Difficulty } from "@/lib/core/difficulty";
-import { CLASSIC_CHEM, chemistryEffect, chemistryLinks, computeChemistry, teamRatings, type ChemRules } from "@/lib/ratings/football";
+import { CLASSIC_CHEM, chemistryBreakdown, chemistryEffect, chemistryLinks, computeChemistry, teamRatings, type ChemRules } from "@/lib/ratings/football";
 import { lineupOf, snapshotRules, type FbSquadSnapshot } from "@/features/football-draft/squad";
 import { ChemLegend, Pitch } from "./Pitch";
 
@@ -26,9 +27,10 @@ export function XiModal({ open, onClose, xi, children }: { open: boolean; onClos
     const fm = FORMATION_BY_ID[xi.formationId];
     const lc: Record<string, FbPlayerSeason | undefined> = lineupOf(xi.lineup);
     const rules = xi.rules ?? CLASSIC_CHEM;
+    const bd = chemistryBreakdown(fm, lc, leagueOf, xi.captainId, rules.extended);
     const chem = computeChemistry(fm, lc, leagueOf, xi.captainId, rules.extended);
     const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
-    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens, rules.weight), links: chemistryLinks(fm, lc, leagueOf, rules.extended), effect: chemistryEffect(chem.total, sens, rules.weight), extended: rules.extended };
+    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens, rules.weight), links: chemistryLinks(fm, lc, leagueOf, rules.extended), effect: chemistryEffect(chem.total, sens, rules.weight), extended: rules.extended, bd };
   }, [xi]);
   return (
     <Sheet open={open} onClose={onClose} title={xi?.title ? `Mi XI · ${xi.title}` : "Mi XI"} testId="xi-modal">
@@ -46,13 +48,14 @@ export function XiModal({ open, onClose, xi, children }: { open: boolean; onClos
           <div className="mx-auto max-w-md">
             <Pitch formation={data.fm} lineup={data.lc} chem={data.chem.perSlot} captainId={xi.captainId} chemMode={chemMode} links={data.links} focus={focus} onSlotClick={(id) => setFocus(focus === id ? null : id)} />
           </div>
-          <p className="text-xs text-muted">La química total ({data.chem.total}/33) suma <b className={data.effect >= 0 ? "text-win" : "text-loss"}>{data.effect >= 0 ? "+" : ""}{data.effect}</b> al ataque y a la defensa del motor de partido (fórmula (química/33 − 0,6)·4). Toca un jugador para ver solo sus vínculos.</p>
+          <p className="text-xs text-muted">La química total ({data.chem.total}/33) suma <b className={data.effect >= 0 ? "text-win" : "text-loss"}>{data.effect >= 0 ? "+" : ""}{data.effect}</b> al ataque y a la defensa del motor de partido (fórmula (química/33 − 0,6)·4). Toca un jugador para ver solo sus vínculos y por qué tiene esa química.</p>
+          {focus && data.bd.slots[focus] && data.lc[focus] && <div className="panel p-3"><ChemWhy s={data.bd.slots[focus]} card={data.lc[focus]!} lineup={data.lc} /></div>}
           <ul className="divide-y divide-line" data-testid="xi-list">
             {data.fm.slots.map((s) => {
               const c = data.lc[s.id];
               if (!c) return <li key={s.id} className="py-2 text-sm text-muted">{s.pos} · vacío</li>;
               return (
-                <li key={s.id} className={`flex items-start gap-3 py-2 ${focus === s.id ? "bg-white/5" : ""}`} data-testid="xi-row">
+                <li key={s.id} onClick={() => setFocus(focus === s.id ? null : s.id)} className={`flex cursor-pointer items-start gap-3 py-2 ${focus === s.id ? "bg-white/5" : ""}`} data-testid="xi-row">
                   <span className="w-10 shrink-0 font-display text-lg text-gold">{s.pos}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-cond text-base font-bold uppercase">{c.name}{xi.captainId === c.id && <span className="ml-1 rounded bg-gold px-1 text-[10px] text-black">C</span>}</span>
