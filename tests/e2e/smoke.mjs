@@ -271,6 +271,11 @@ async function mobileFootball() {
     assert(await pick.isVisible(), `${w}×${h}: ELEGIR reachable inside the sheet`);
     if (w === 390) await p.screenshot({ path: `${SHOTS}/mobile-football-sheet.png` });
     await pick.click();
+    await p.goto(BASE + "/");
+    await p.getByTestId("menu-button").click();
+    await p.getByTestId("mobile-menu").getByRole("link", { name: "Logros" }).click();
+    await p.getByTestId("achievements-page").waitFor();
+    assert(!(await p.getByTestId("mobile-menu").isVisible().catch(() => false)), `${w}×${h}: mobile menu opens, navigates and closes`);
     for (const path of ["/", "/nba", "/legado", "/logros", "/settings", "/history"]) {
       await p.goto(BASE + path);
       const sw2 = await p.evaluate(() => document.documentElement.scrollWidth);

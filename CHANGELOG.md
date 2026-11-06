@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-11-06
+### Corregido
+- iPhone (app en pantalla de inicio): la cabecera quedaba debajo de la barra de estado y el menú no se podía tocar. Ahora respeta la zona segura superior y en móvil usa un botón **Menú** con enlaces grandes (escritorio sin cambios).
+
 ## 0.5.0 — 2026-11-06 (Legends Lab V4)
 ### Corregido / explicado
 - Química del caso De Jong: verificada (4 de LaLiga = +1 liga → 1/3 en FUT; correcto). Nuevo desglose único `chemistryBreakdown` y panel **¿Por qué tengo esta química?** con umbrales, compañeros y consejos.
