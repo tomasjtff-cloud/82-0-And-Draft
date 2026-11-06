@@ -35,6 +35,7 @@ export interface FbPlayerSeason {
   source: string;
   verification: "manual-curation" | "api-verified";
   updatedAt: string;
+  check?: import("@/lib/data/verification").VerificationInfo;
 }
 
 export interface FormationSlot { id: string; pos: FbPos; x: number; y: number }

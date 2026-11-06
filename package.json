@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "node tests/e2e/smoke.mjs",
-    "validate:data": "tsx scripts/validate-data.ts"
+    "validate:data": "tsx scripts/validate-data.ts",
+    "verify:data": "NODE_USE_ENV_PROXY=1 tsx scripts/verify-nba-538.ts && NODE_USE_ENV_PROXY=1 tsx scripts/verify-wikidata.ts nba && NODE_USE_ENV_PROXY=1 tsx scripts/verify-wikidata.ts football"
   },
   "dependencies": {
     "motion": "^12.23.12",

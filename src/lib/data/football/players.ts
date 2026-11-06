@@ -1027,7 +1027,7 @@ export const FB_PLAYER_SEASONS: FbPlayerSeason[] = [
   p("Luka Modrić", "CRO", "MIL", 2025, "CM", 84, "PM"),
 
   // ═════════ Inter ═════════
-  p("Liam Brady", "IRL", "INT", 1982, "CM", 84, "PM"),
+  p("Liam Brady", "IRL", "INT", 1984, "CM", 83, "PM"),
   p("Karl-Heinz Rummenigge", "GER", "INT", 1984, "ST", 85, "CF"),
   p("Alessandro Altobelli", "ITA", "INT", 1984, "ST", 83, "POA"),
   p("Lothar Matthäus", "GER", "INT", 1988, "CM", 91, "BTB"),

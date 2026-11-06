@@ -1,5 +1,6 @@
 import type { NbaCard, NbaPlayerSeason, NbaPos, NbaRatings } from "@/types/nba";
 import { leagueContext, MODERN } from "./nba-context";
+import { nbaVerification } from "@/lib/data/verification";
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 const to100 = (x: number) => Math.round(clamp(x, 25, 99));
@@ -88,7 +89,7 @@ export function rateNbaPlayer(p: NbaPlayerSeason): NbaRatings {
 const cache = new Map<string, NbaCard>();
 export function toCard(p: NbaPlayerSeason): NbaCard {
   let c = cache.get(p.id);
-  if (!c) { c = { ...p, ratings: rateNbaPlayer(p) }; cache.set(p.id, c); }
+  if (!c) { c = { ...p, ratings: rateNbaPlayer(p), check: nbaVerification(p.id) }; cache.set(p.id, c); }
   return c;
 }
 

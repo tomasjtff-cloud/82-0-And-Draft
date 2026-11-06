@@ -12,9 +12,11 @@ import type { Difficulty } from "@/lib/core/difficulty";
 import { FB_PLAYER_SEASONS } from "@/lib/data/football/players";
 import { FORMATION_BY_ID, draftOrder } from "@/lib/data/football/formations";
 import { DRAFT_FIT_MIN, slotFit } from "@/lib/ratings/football";
+import { fbVerification } from "@/lib/data/verification";
 import type { DraftMode, FbDecade, FbDraftState, FbPlayerSeason, FbSpin, FormationSlot } from "@/types/football";
 
-export const FB_CARDS = FB_PLAYER_SEASONS;
+/** Cards with their external verification; rows contradicted by Wikidata never enter the draft. */
+export const FB_CARDS = FB_PLAYER_SEASONS.map((c) => ({ ...c, check: fbVerification(c.id) })).filter((c) => c.check.membership !== "contradicted");
 export const FB_CARD_BY_ID: Record<string, FbPlayerSeason> = Object.fromEntries(FB_CARDS.map((c) => [c.id, c]));
 
 const POOL = new Map<string, FbPlayerSeason[]>();

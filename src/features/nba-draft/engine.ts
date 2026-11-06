@@ -11,7 +11,8 @@ import { toCard } from "@/lib/ratings/nba";
 import type { Decade, NbaCard, NbaDraftState, NbaPos, NbaSpin } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
 
-export const ALL_CARDS: NbaCard[] = NBA_PLAYER_SEASONS.map(toCard);
+/** Rows contradicted by an external source never enter the draft. */
+export const ALL_CARDS: NbaCard[] = NBA_PLAYER_SEASONS.map(toCard).filter((c) => c.check.membership !== "contradicted");
 export const CARD_BY_ID: Record<string, NbaCard> = Object.fromEntries(ALL_CARDS.map((c) => [c.id, c]));
 
 const POOL = new Map<string, NbaCard[]>();

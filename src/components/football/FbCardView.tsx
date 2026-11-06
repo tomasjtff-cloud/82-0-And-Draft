@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { HIST_CLUB_BY_ID } from "@/lib/data/football/clubs";
 import { rarityOf, STYLE_LABEL } from "@/lib/ratings/football";
 import type { FbPlayerSeason } from "@/types/football";
+import { VerifyBadge } from "@/components/common/VerifyBadge";
 
 const FRAME: Record<string, string> = { icon: "frame-icon", rare: "frame-gold", gold: "frame-gold", silver: "frame-silver", bronze: "frame-bronze" };
 
@@ -47,7 +48,13 @@ export function FbCardView({ card, onPick, pickLabel = "Elegir", index = 0, high
           <span>{STYLE_LABEL[card.style]}</span>
           {card.leagueGoals != null && <span>{card.leagueGoals} goles liga</span>}
         </div>
-        <p className="mt-1 text-[9.5px] leading-snug opacity-75">Atributos estimados (Legends Lab, no EA). Pertenencia club/temporada: curación manual.</p>
+        <div className="mt-2"><VerifyBadge check={card.check} onDark={false} /></div>
+        {card.check?.spell && (card.check.spell.apps != null || card.check.spell.start) && (
+          <p className="mt-1 text-[10.5px] font-semibold" data-testid="spell-line">
+            Etapa {card.check.spell.start ?? "?"}–{card.check.spell.end ?? "…"}{card.check.spell.apps != null ? ` · ${card.check.spell.apps} PJ` : ""}{card.check.spell.goals != null ? ` · ${card.check.spell.goals} goles` : ""} (Wikidata)
+          </p>
+        )}
+        <p className="mt-1 text-[9.5px] leading-snug opacity-75">Atributos PAC/SHO/… estimados por Legends Lab (no EA). Datos verificados: solo los marcados con fuente.</p>
         {onPick && (
           <button className="mt-3 w-full rounded-lg bg-black/85 py-2 font-cond text-sm font-bold uppercase tracking-wider text-gold-2 transition hover:bg-black disabled:opacity-40"
             onClick={onPick} disabled={disabled} data-testid={testId ?? `fb-pick-${card.id}`}>{pickLabel}</button>

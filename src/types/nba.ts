@@ -61,6 +61,7 @@ export interface NbaRatings {
 
 export interface NbaCard extends NbaPlayerSeason {
   ratings: NbaRatings;
+  check: import("@/lib/data/verification").VerificationInfo;
 }
 
 export interface NbaSpin {

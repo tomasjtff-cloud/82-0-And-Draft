@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { FRANCHISE_BY_ID } from "@/lib/data/nba/franchises";
 import type { NbaCard, NbaPos } from "@/types/nba";
 import { StatBar } from "@/components/common/StatBar";
+import { VerifyBadge } from "@/components/common/VerifyBadge";
 
 const fmtPct = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}`);
 const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(1));
@@ -79,9 +80,19 @@ export function NbaCardView({ card, placeable = [], disabledReason, onPick, comp
               <StatBar label="Aro" value={card.ratings.rimProtection} estimated={est.has("rimProtection")} />
               <StatBar label="Tiro" value={card.ratings.shooting} estimated={est.has("shooting")} />
             </div>
-            <p className="mt-2 text-[10px] leading-snug text-dim" title={card.source}>
-              Stats: {card.verification === "manual-curation" ? "curación manual (pendiente verificación API)" : card.verification} · GP {card.gp ?? "—"} · Ajuste época ×{card.ratings.eraAdjustment}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5"><VerifyBadge check={card.check} /></div>
+            {card.check.raptor && (
+              <p className="mt-1 font-mono text-[10px] text-muted" data-testid="raptor-line">
+                RAPTOR {card.check.raptor.raptorTotal > 0 ? "+" : ""}{card.check.raptor.raptorTotal} (O {card.check.raptor.raptorOffense} / D {card.check.raptor.raptorDefense}) · WAR {card.check.raptor.war} · {card.check.raptor.mp} min
+              </p>
+            )}
+            {card.check.spell && !card.check.raptor && (
+              <p className="mt-1 text-[10px] text-muted">Etapa en el equipo (Wikidata): {card.check.spell.start ?? "?"} → {card.check.spell.end ?? "…"}</p>
+            )}
+            <p className="mt-1 text-[10px] leading-snug text-dim" title={card.source}>
+              Por partido: curación manual · GP {card.gp ?? "—"} · Ajuste época ×{card.ratings.eraAdjustment}
               {est.size > 0 && " · * atributo estimado (dato no registrado)"}
+              {card.check.raptor && " · Métricas avanzadas: FiveThirtyEight (CC BY 4.0)"}
             </p>
           </>
         )}
