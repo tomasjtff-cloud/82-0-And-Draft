@@ -44,20 +44,30 @@ export function drawLeaguePhase(teams: SimTeam[], rng: Rng): LeagueFixture[] {
           const pending: [string, string][] = [];
           let bad = false;
           if (i === j) {
-            const cyc = rng.shuffle(pots[i]);
-            for (let k = 0; k < 9 && !bad; k++) {
-              const h = cyc[k], a = cyc[(k + 1) % 9];
-              if (!okPair(h, a, pending)) bad = true; else pending.push([h, a]);
+            // greedy random walk building a 9-cycle through valid hosts
+            const pot = pots[i];
+            const start = pot[rng.int(pot.length)];
+            const used = new Set([start]);
+            let cur = start;
+            for (let k = 1; k < pot.length && !bad; k++) {
+              const opts = pot.filter((t) => !used.has(t) && okPair(cur, t, pending));
+              if (!opts.length) { bad = true; break; }
+              const nx = opts[rng.int(opts.length)];
+              pending.push([cur, nx]); used.add(nx); cur = nx;
             }
+            if (!bad) { if (okPair(cur, start, pending)) pending.push([cur, start]); else bad = true; }
           } else {
-            const sigma = rng.shuffle(pots[j]), tau = rng.shuffle(pots[j]);
-            for (let k = 0; k < 9 && !bad; k++) {
-              const x = pots[i][k];
-              if (sigma[k] === tau[k]) { bad = true; break; }
-              if (!okPair(x, sigma[k], pending)) { bad = true; break; }
-              pending.push([x, sigma[k]]);
-              if (!okPair(tau[k], x, pending)) { bad = true; break; }
-              pending.push([tau[k], x]);
+            // greedy: each pot-i team picks a valid team to host, then a valid (different) team to visit
+            const hostTaken = new Set<string>(), awayTaken = new Set<string>();
+            for (const x of rng.shuffle(pots[i])) {
+              const s1 = pots[j].filter((t) => !awayTaken.has(t) && okPair(x, t, pending));
+              if (!s1.length) { bad = true; break; }
+              const sg = s1[rng.int(s1.length)];
+              pending.push([x, sg]); awayTaken.add(sg);
+              const s2 = pots[j].filter((t) => !hostTaken.has(t) && t !== sg && okPair(t, x, pending));
+              if (!s2.length) { bad = true; break; }
+              const tu = s2[rng.int(s2.length)];
+              pending.push([tu, x]); hostTaken.add(tu);
             }
           }
           if (!bad) { commit(pending); done = true; }

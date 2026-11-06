@@ -144,6 +144,19 @@ export interface NbaTeamEval {
   strengths: string[];
   weaknesses: string[];
   notes: string[];
+  /** Explainable fit/chemistry terms; their applied values sum to fitAdjust (before difficulty scaling). */
+  fit: FitItem[];
+  /** what each player brings (team-best or filling a need) */
+  roles: { pos: NbaPos; name: string; brings: string[] }[];
+}
+
+export interface FitItem {
+  key: "spacing" | "creator" | "rim" | "rebounding" | "ball" | "position" | "defense";
+  label: string;
+  status: "bonus" | "ok" | "pending" | "penalty";
+  /** net-rating points applied (0 when pending/ok) */
+  value: number;
+  detail: string;
 }
 
 /** Penalty for playing a card at a listed secondary position. */
@@ -171,22 +184,52 @@ export function evaluateNbaTeam(lineup: Partial<Record<NbaPos, NbaCard>>, fitSen
   const shooting = avg((c) => c.ratings.shooting);
   const versatility = avg((c) => c.ratings.versatility);
 
-  const notes: string[] = [];
-  let fit = 0;
+  /* Fit terms (documented in ARCHITECTURE.md → "Química NBA"). Values are net-rating points.
+   * Needs that later picks could still cover are "pending" (not applied) until the lineup is complete. */
+  const complete = cards.length === 5;
+  const left = 5 - cards.length;
+  const fitItems: FitItem[] = [];
   const shooters = cards.filter((c) => c.ratings.shooting >= 62).length;
-  if (cards.length === 5) {
-    if (shooters < 2) { fit -= (2 - shooters) * 1.6; notes.push("Poco espaciado: menos de dos tiradores fiables."); }
-    if (shooters >= 4) { fit += 1; notes.push("Espaciado excelente."); }
-    if (max((c) => c.ratings.playmaking) < 62) { fit -= 1.8; notes.push("Sin un creador de juego claro."); }
-    if (rimProtection < 55) { fit -= 1.8; notes.push("Pintura desprotegida: sin protector de aro."); }
-    if (rebounding < 48) { fit -= 1.2; notes.push("Rebote débil."); }
-    const highUsage = cards.filter((c) => c.ppg * normalizeUsage(c) >= 26).length;
-    if (highUsage >= 3) { fit -= (highUsage - 2) * 1.1; notes.push("Demasiados anotadores dominantes: un solo balón."); }
-    const offPos = entries.reduce((s, [pos, c]) => s + positionPenalty(c, pos), 0);
-    if (offPos > 0) { fit -= offPos; notes.push("Algún jugador en su posición secundaria."); }
-  }
+  const need = (k: FitItem["key"], label: string, okCond: boolean, penalty: number, okText: string, badText: string, bonus?: { cond: boolean; value: number; text: string }) => {
+    if (bonus?.cond) fitItems.push({ key: k, label, status: "bonus", value: bonus.value, detail: bonus.text });
+    else if (okCond) fitItems.push({ key: k, label, status: "ok", value: 0, detail: okText });
+    else if (!complete && cards.length > 0) fitItems.push({ key: k, label, status: "pending", value: 0, detail: `${badText} (aún quedan ${left} elección${left === 1 ? "" : "es"})` });
+    else if (cards.length > 0) fitItems.push({ key: k, label, status: "penalty", value: -penalty, detail: badText });
+  };
+  need("spacing", "Tiro y espaciado", shooters >= 2, (2 - Math.min(2, shooters)) * 1.6,
+    `${shooters} tirador(es) fiable(s) (tiro ≥ 62)`, `Solo ${shooters} tirador(es) fiable(s): la defensa se cierra`,
+    { cond: shooters >= 4 || (shooters >= 3 && complete), value: shooters >= 4 ? 1 : 0.5, text: `${shooters} tiradores: espaciado ${shooters >= 4 ? "excelente" : "muy bueno"}` });
+  const bestPm = max((c) => c.ratings.playmaking);
+  need("creator", "Creación de juego", bestPm >= 62, 1.8, `Creador principal: ${cards.find((c) => c.ratings.playmaking === bestPm)?.name ?? "—"} (${Math.round(bestPm)})`, "Sin un creador de juego claro (creación < 62)",
+    { cond: bestPm >= 85, value: 0.5, text: `Creador de élite: ${cards.find((c) => c.ratings.playmaking === bestPm)?.name} (${Math.round(bestPm)})` });
+  need("rim", "Protección del aro", rimProtection >= 55, 1.8, `Protector: ${cards.find((c) => c.ratings.rimProtection === rimProtection)?.name ?? "—"} (${Math.round(rimProtection)})`, "Pintura desprotegida (aro < 55)",
+    { cond: rimProtection >= 85, value: 0.5, text: `Protector de aro de élite: ${cards.find((c) => c.ratings.rimProtection === rimProtection)?.name} (${Math.round(rimProtection)})` });
+  need("rebounding", "Rebote", rebounding >= 48, 1.2, `Rebote medio ${Math.round(rebounding)}`, `Rebote débil (media ${Math.round(rebounding)} < 48)`);
+  const avgDef = avg((c) => c.ratings.defense);
+  need("defense", "Equilibrio defensivo", avgDef >= 50, 1.2, `Defensa media ${Math.round(avgDef)}`, `Demasiados defensores débiles (defensa media ${Math.round(avgDef)} < 50)`);
+  const highUsage = cards.filter((c) => c.ppg * normalizeUsage(c) >= 26);
+  if (highUsage.length >= 3) fitItems.push({ key: "ball", label: "Un solo balón", status: "penalty", value: -(highUsage.length - 2) * 1.1, detail: `${highUsage.length} anotadores que necesitan el balón (≥26 pts ajustados): ${highUsage.map((c) => c.name).join(", ")}` });
+  else if (cards.length) fitItems.push({ key: "ball", label: "Un solo balón", status: "ok", value: 0, detail: `${highUsage.length} anotador(es) dominante(s): reparto sostenible` });
+  const offPos = entries.filter(([pos, c]) => positionPenalty(c, pos) > 0);
+  if (offPos.length) fitItems.push({ key: "position", label: "Posiciones", status: "penalty", value: -0.6 * offPos.length, detail: `En posición secundaria: ${offPos.map(([pos, c]) => `${c.name} (${pos})`).join(", ")} (−0,6 c/u)` });
+  else if (cards.length) fitItems.push({ key: "position", label: "Posiciones", status: "ok", value: 0, detail: "Todos en su posición natural" });
+
+  const fit = fitItems.reduce((s, i) => s + i.value, 0);
+  const notes = fitItems.filter((i) => i.status === "penalty" || i.status === "bonus").map((i) => i.detail + ".");
   const fitAdjust = Math.round(fit * fitSensitivity * 10) / 10;
-  const chemistry = Math.round(clamp(70 + fit * 6 + (shooters >= 3 ? 6 : 0), 0, 100));
+  /** Chemistry 0–100 is a direct display of the fit terms: 70 + 8·Σvalue. */
+  const chemistry = Math.round(clamp(70 + fit * 8, 0, 100));
+  const roles = entries.map(([pos, c]) => {
+    const brings: string[] = [];
+    const isBest = (f: (x: NbaCard) => number) => cards.length > 1 && f(c) === max(f);
+    if (isBest((x) => x.ratings.offense)) brings.push("principal anotador");
+    if (c.ratings.playmaking >= 62 && isBest((x) => x.ratings.playmaking)) brings.push("creador");
+    if (c.ratings.shooting >= 62) brings.push("tirador");
+    if (c.ratings.rimProtection >= 55 && isBest((x) => x.ratings.rimProtection)) brings.push("protector del aro");
+    if (isBest((x) => x.ratings.rebounding)) brings.push("reboteador");
+    if (c.ratings.defense >= 70) brings.push("defensor");
+    return { pos, name: c.name, brings };
+  });
 
   const base = (overall - TEAM_OVR_PIVOT) * TEAM_OVR_SLOPE + (offense - 80) * 0.06 + (defense - 65) * 0.06;
   const net = Math.round((base + fitAdjust) * 10) / 10;
@@ -201,11 +244,41 @@ export function evaluateNbaTeam(lineup: Partial<Record<NbaPos, NbaCard>>, fitSen
   return {
     overall: Math.round(overall), offense: Math.round(offense), defense: Math.round(defense),
     playmaking: Math.round(playmaking), rebounding: Math.round(rebounding), rimProtection: Math.round(rimProtection),
-    shooting: Math.round(shooting), versatility: Math.round(versatility), chemistry, net, fitAdjust, strengths, weaknesses, notes,
+    shooting: Math.round(shooting), versatility: Math.round(versatility), chemistry, net, fitAdjust, strengths, weaknesses, notes, fit: fitItems, roles,
   };
 }
 
 function normalizeUsage(c: NbaCard): number {
   const ctx = leagueContext(c.startYear);
   return (MODERN.pace / ctx.pace) * (MODERN.ortg / ctx.ortg);
+}
+
+
+export interface PickPreview { before: NbaTeamEval; after: NbaTeamEval; deltaNet: number; deltaChem: number; messages: { tone: "good" | "bad" | "neutral"; text: string }[] }
+
+/** What adding `card` at `pos` would do to the team — computed with the same model the simulator uses. */
+export function previewPick(lineup: Partial<Record<NbaPos, NbaCard>>, card: NbaCard, pos: NbaPos, fitSensitivity = 1): PickPreview {
+  const before = evaluateNbaTeam(lineup, fitSensitivity);
+  const after = evaluateNbaTeam({ ...lineup, [pos]: card }, fitSensitivity);
+  const messages: PickPreview["messages"] = [];
+  const empty = Object.values(lineup).filter(Boolean).length === 0;
+  const cat: [keyof NbaTeamEval, string, string][] = [
+    ["shooting", "tu tiro exterior", "tu tiro exterior"], ["playmaking", "la creación de juego", "la creación de juego"],
+    ["defense", "la defensa", "el equilibrio defensivo"], ["rimProtection", "la protección del aro", "la protección del aro"],
+    ["rebounding", "el rebote", "el rebote"], ["offense", "el ataque", "el ataque"],
+  ];
+  if (!empty) for (const [k, up, down] of cat) {
+    const d = (after[k] as number) - (before[k] as number);
+    if (d >= 2) messages.push({ tone: "good", text: `Mejora ${up} (+${Math.round(d)})` });
+    else if (d <= -2) messages.push({ tone: "bad", text: `Reduce ${down} (${Math.round(d)})` });
+  }
+  const statusOf = (e: NbaTeamEval, k: FitItem["key"]) => e.fit.find((i) => i.key === k);
+  for (const k of ["spacing", "creator", "rim", "rebounding", "defense", "ball", "position"] as FitItem["key"][]) {
+    const b = statusOf(before, k), a = statusOf(after, k);
+    if (!a) continue;
+    if ((a.status === "penalty" || a.status === "bonus") && (a.value !== (b?.value ?? 0))) messages.push({ tone: a.value > (b?.value ?? 0) ? "good" : "bad", text: `${a.label}: ${a.detail} (${a.value > 0 ? "+" : ""}${a.value.toFixed(1)} net)` });
+    else if (b && (b.status === "pending" || b.status === "penalty") && a.status === "ok") messages.push({ tone: "good", text: `Cubre una necesidad: ${a.label.toLowerCase()} — ${a.detail}` });
+  }
+  if (!messages.length) messages.push({ tone: "neutral", text: "Encaje neutro: no cambia el equilibrio del equipo." });
+  return { before, after, deltaNet: Math.round((after.net - before.net) * 10) / 10, deltaChem: after.chemistry - before.chemistry, messages };
 }
