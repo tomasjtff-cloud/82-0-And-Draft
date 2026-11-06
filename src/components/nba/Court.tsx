@@ -2,13 +2,15 @@
 import { motion, AnimatePresence } from "motion/react";
 import type { NbaCard, NbaPos } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
-import { tierOf } from "./NbaCardView";
+import { FRANCHISE_BY_ID } from "@/lib/data/nba/franchises";
+import { Jersey } from "./Jersey";
 
 const SPOTS: Record<NbaPos, { x: number; y: number }> = {
-  PG: { x: 50, y: 78 }, SG: { x: 18, y: 58 }, SF: { x: 82, y: 58 }, PF: { x: 30, y: 26 }, C: { x: 66, y: 22 },
+  PG: { x: 50, y: 80 }, SG: { x: 17, y: 60 }, SF: { x: 83, y: 60 }, PF: { x: 30, y: 27 }, C: { x: 68, y: 22 },
 };
 
-export function Court({ lineup, selected, onSlotClick }: { lineup: Partial<Record<NbaPos, NbaCard>>; selected?: NbaPos | null; onSlotClick?: (p: NbaPos) => void }) {
+/** Half court with the five positions; drafted players appear as original jerseys. */
+export function Court({ lineup, selected, onSlotClick, highlight = [] }: { lineup: Partial<Record<NbaPos, NbaCard>>; selected?: NbaPos | null; onSlotClick?: (p: NbaPos) => void; highlight?: NbaPos[] }) {
   return (
     <div className="court relative aspect-[5/4] w-full overflow-hidden" data-testid="court">
       <svg viewBox="0 0 500 400" className="absolute inset-0 h-full w-full" aria-hidden>
@@ -25,27 +27,22 @@ export function Court({ lineup, selected, onSlotClick }: { lineup: Partial<Recor
       {NBA_POSITIONS.map((p) => {
         const c = lineup[p];
         const s = SPOTS[p];
-        const isSel = selected === p;
+        const fr = c ? FRANCHISE_BY_ID[c.franchiseId] : null;
+        const hl = highlight.includes(p);
         return (
-          <button key={p} onClick={() => onSlotClick?.(p)} data-testid={`slot-${p}`}
-            aria-label={c ? `${p}: ${c.name}` : `${p} vacío`}
-            className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${s.x}%`, top: `${s.y}%` }}>
+          <button key={p} onClick={() => onSlotClick?.(p)} data-testid={`slot-${p}`} aria-label={c ? `${p}: ${c.name}` : `${p} vacío`}
+            className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${s.x}%`, top: `${s.y}%` }}>
             <AnimatePresence mode="wait">
-              {c ? (
-                <motion.div key={c.id} initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.4, opacity: 0 }}
-                  className={`w-[92px] rounded-xl bg-gradient-to-br p-[1.5px] shadow-xl sm:w-[120px] ${tierOf(c.ratings.overall).ring} ${isSel ? "ring-2 ring-white" : ""}`}>
-                  <div className="rounded-[10px] bg-ink/90 px-2 py-1.5 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="font-display text-xl leading-none">{c.ratings.overall}</span>
-                      <span className="font-cond text-xs font-bold text-nba-2">{p}</span>
-                    </div>
-                    <div className="truncate font-cond text-[13px] font-bold uppercase leading-tight">{c.name}</div>
-                    <div className="truncate text-[10px] text-muted">{c.season} · {c.franchiseId}</div>
-                  </div>
+              {c && fr ? (
+                <motion.div key={c.id} initial={{ scale: 0.3, opacity: 0, y: -20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.3, opacity: 0 }}
+                  className={`flex flex-col items-center ${selected === p ? "drop-shadow-[0_0_10px_rgba(255,255,255,.9)]" : "drop-shadow-lg"}`}>
+                  <Jersey primary={fr.colors[0]} secondary={fr.colors[1]} label={String(c.ratings.overall)} size={46} />
+                  <span className="mt-0.5 max-w-[84px] truncate rounded bg-black/75 px-1.5 py-0.5 font-cond text-[11px] font-bold uppercase leading-tight sm:max-w-[110px] sm:text-xs">{c.name.split(" ").slice(-1)[0]}</span>
+                  <span className="font-cond text-[10px] font-bold text-nba-2">{p}</span>
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-white/50 bg-black/30 font-display text-lg sm:h-16 sm:w-16">
+                  className={`grid h-12 w-12 place-items-center rounded-full border-2 border-dashed font-display text-base sm:h-14 sm:w-14 ${hl ? "animate-pulse border-nba bg-nba/25 text-nba-2" : "border-white/50 bg-black/35"}`}>
                   {p}
                 </motion.div>
               )}

@@ -27,6 +27,7 @@ async function nbaFlow() {
   await page.getByTestId("enter-nba").click();
   await page.getByTestId("difficulty-HARD").click();
   await page.getByTestId("start-nba-draft").click();
+  await page.getByTestId("spin-btn").click();
   const team0 = await page.getByTestId("reel-team").getAttribute("data-final");
   const era0 = await page.getByTestId("reel-era").getAttribute("data-final");
   if (await page.getByTestId("respin-team").isEnabled()) {
@@ -37,27 +38,55 @@ async function nbaFlow() {
     assert(await page.getByTestId("respin-team").isDisabled(), "team re-spin disabled after use");
   }
   for (let round = 0; round < 5; round++) {
-    const btn = page.locator('[data-testid^="pick-"]').first();
-    await btn.waitFor();
-    await btn.click();
+    if (await page.getByTestId("spin-btn").isVisible()) await page.getByTestId("spin-btn").click();
+    const rows = page.locator('[data-testid="player-row"][data-placeable="true"]');
+    const ids = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-card-id")));
+    const names = await rows.evaluateAll((els) => els.map((e) => e.querySelector("span span")?.textContent));
+    assert(new Set(names).size === names.length, `round ${round + 1}: no repeated players in the list`);
+    await rows.first().click();
+    await page.getByTestId("pick-preview").waitFor();
+    await page.locator('[data-testid="player-sheet"] button[data-testid^="pick-"]').first().click();
+    void ids;
   }
+  await page.getByTestId("view-quintet").click();
+  assert((await page.getByTestId("quintet-row").count()) === 5, "VER MI QUINTETO shows 5 positions during the draft");
+  await page.getByTestId("sheet-close").click();
   await page.screenshot({ path: `${SHOTS}/nba-draft-complete.png` });
   await page.getByTestId("simulate-season").click();
-  await page.getByTestId("game-grid").waitFor();
+  await page.getByTestId("postseason-badge").waitFor();
   const rec = (await page.getByTestId("final-record").innerText()).replace(/\s/g, "");
   const [w, l] = rec.split("-").map(Number);
   assert(w + l === 82, `record ${w}-${l} sums to 82`);
+  await page.getByTestId("nba-tab-calendar").click();
   assert((await page.getByTestId("game-cell").count()) === 82, "82 games listed");
   await page.getByTestId("game-cell").first().click();
-  assert(await page.getByTestId("game-detail").isVisible(), "game detail inspectable");
+  assert(await page.getByTestId("box-score").isVisible(), "game detail with box score");
+  await page.getByTestId("nba-tab-standings").click();
+  assert(await page.getByTestId("standing-user").isVisible(), "standings include the user");
+  await page.getByTestId("nba-tab-playoffs").click();
+  const outcome = await page.getByTestId("playoff-outcome").getAttribute("data-outcome");
+  assert(!!outcome, `playoff outcome shown (${outcome})`);
+  await page.getByTestId("nba-tab-stats").click();
+  assert((await page.locator('[data-testid="stats-table"] tbody tr').count()) === 6, "player stats table: 5 starters + bench");
+  await page.getByTestId("view-quintet").click();
+  assert((await page.getByTestId("quintet-row").count()) === 5, "VER MI QUINTETO after the season");
+  await page.getByTestId("sheet-close").click();
   await page.getByTestId("replay-season").click();
-  await page.getByTestId("game-grid").waitFor();
+  await page.getByTestId("postseason-badge").waitFor();
   const rec2 = (await page.getByTestId("final-record").innerText()).replace(/\s/g, "");
   assert(rec2 === rec, "same seed reproduces same record");
+  await page.getByTestId("nba-tab-mc").click();
   await page.getByTestId("mc-500").click();
-  await page.getByText("Media de victorias").waitFor({ timeout: 20000 });
-  assert(true, "monte carlo ran");
+  await page.getByText("P(anillo)").waitFor({ timeout: 60000 });
+  assert(true, "monte carlo ran (incl. ring probability)");
   await page.screenshot({ path: `${SHOTS}/nba-results.png`, fullPage: true });
+  await page.goto(BASE + "/history");
+  await page.getByTestId("history-quintet").first().click();
+  assert((await page.getByTestId("quintet-row").count()) === 5, "quintet available from history");
+  await page.goto(BASE + "/nba");
+  await page.getByTestId("open-last").click();
+  await page.getByTestId("postseason-badge").waitFor();
+  assert(true, "last season survives a reload");
   await page.getByTestId("new-draft").click();
   await page.getByTestId("start-nba-draft").waitFor();
   assert(true, "can start another draft");
@@ -82,6 +111,9 @@ async function footballFlow() {
   }
   await page.getByTestId("fb-chemistry").waitFor();
   await page.screenshot({ path: `${SHOTS}/football-squad.png`, fullPage: true });
+  await page.getByTestId("fb-mc-100").click();
+  await page.locator('[data-testid="fb-mc-results"][data-status="done"]').waitFor({ timeout: 120000 });
+  assert((await page.getByTestId("fb-mc-progress").innerText()).includes("100 / 100"), "football Monte Carlo ran 100 full seasons in the worker");
   await page.getByTestId("fb-quick-sim").click();
   await page.getByTestId("fb-trophies").waitFor({ timeout: 60000 });
   for (const t of ["pl", "ucl", "fa", "efl"]) await page.getByTestId(`fb-trophy-${t}`).waitFor();

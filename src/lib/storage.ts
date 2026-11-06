@@ -4,6 +4,7 @@ export const KEYS = {
   history: "ll:history:v1",
   nbaBest: "ll:nba:best:v1",
   nbaDraft: "ll:nba:draft:v1",
+  nbaLast: "ll:nba:last:v1",
   fbSession: "ll:fb:session:v1",
 } as const;
 
@@ -36,6 +37,8 @@ export interface HistoryEntry {
   title: string;      // e.g. "76-6" or "Doblete"
   detail: string;     // lineup / trophies summary
   score: number;      // wins (nba) or trophies (football)
+  /** v2+: full team snapshot (older entries don't have it and stay readable) */
+  nba?: import("@/types/nba").NbaTeamSnapshot;
 }
 
 export function addHistory(e: Omit<HistoryEntry, "id" | "date">): void {

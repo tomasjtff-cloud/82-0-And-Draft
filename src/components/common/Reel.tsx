@@ -25,9 +25,9 @@ export function Reel({ value, pool, label, durationMs, accent = "#ff6a13", testI
     return () => clearTimeout(timer);
   }, [value, pool, durationMs]);
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-line-strong bg-ink/70 px-4 py-3" data-testid={testId} data-final={value}>
+    <div className="relative overflow-hidden rounded-2xl border border-line-strong bg-ink/70 px-3 py-2 sm:px-4 sm:py-3" data-testid={testId} data-final={value}>
       <div className="font-cond text-[11px] font-bold uppercase tracking-[.2em] text-muted">{label}</div>
-      <div className={`font-display mt-1 truncate text-3xl md:text-4xl ${spinning ? "blur-[1px]" : ""}`} style={{ color: spinning ? "#9aa1ac" : accent }}>
+      <div className={`font-display mt-0.5 truncate text-2xl sm:text-3xl md:text-4xl ${spinning ? "blur-[1px]" : ""}`} style={{ color: spinning ? "#9aa1ac" : accent }}>
         {shown}
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-ink to-transparent" />

@@ -45,7 +45,8 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 - ~700 versiones de jugador (temporada concreta) en las 30 franquicias, 1960s–2020s.
 - Cartas con PPG/RPG/APG/SPG/BPG/FG%/3P%/FT%, ratings propios con ajuste por época y marcas de atributos estimados.
 - Cancha interactiva, intercambio de posiciones válidas, evaluación de equipo (ataque, defensa, creación, rebote, aro, tiro, versatilidad, química).
-- Simulación probabilística de 82 partidos con semilla, localía, back-to-backs, dificultad; resultados partido a partido; análisis; Monte Carlo (500/2000 temporadas).
+- Simulación probabilística de 82 partidos con semilla, localía, back-to-backs y dificultad; liga completa de 31 equipos, clasificación y **playoffs al mejor de 7 hasta el anillo**; box scores y **estadísticas simuladas de tus jugadores** (temporada y playoffs); Monte Carlo con probabilidad de anillo.
+- Ratings v2 calibrados contra RAPTOR (FiveThirtyEight) con escala de tiers; un jugador por lista (su mejor temporada, las demás consultables); **química explicable** con vista previa antes de elegir; botón **VER MI QUINTETO** en draft, resultados e historial; diseño mobile-first (ruletas + GIRAR, cancha con camisetas, lista inferior con filtros).
 - Mejor récord, historial y draft en curso guardados en el navegador.
 
 **Football Ultimate Draft**
@@ -55,16 +56,16 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 - 8 formaciones, campo interactivo, intercambios, cambio de formación post-draft, química (0–33), TEAM OVR / ATTACK / MIDFIELD / DEFENSE.
 - Temporada 2026/27 (escenario de juego): Premier League completa (20 clubes, 380 partidos), Champions League con fase liga de 36 equipos + playoffs + eliminatorias, FA Cup desde 3ª ronda, Carabao Cup desde 2ª ronda.
 - Quick Sim y Live Season (partido a partido / evento a evento, se puede continuar más tarde).
+- **Monte Carlo de temporadas completas** (100/500/1.000/2.000) en Web Worker: probabilidad de cada título y del quadruple con IC95%, posición/puntos medios, distribución de posiciones y rondas alcanzadas.
 - Vitrina de 4 trofeos con estado WON / RUNNER-UP / ELIMINATED / NOT QUALIFIED y celebración del quadruple.
 
 ## Deployment
 
-- **Plataforma:** **GitHub Pages** (gratis, sin cuenta adicional). URL: **https://tomasjtff-cloud.github.io/82-0-And-Draft/**
-- **Cómo funciona:** `.github/workflows/pages.yml` ejecuta los tests, compila un *export* estático de Next.js (`GITHUB_PAGES=true` → `basePath=/82-0-And-Draft`) y lo publica. Cada push a `main` despliega automáticamente.
-- **Activación (una sola vez):** GitHub → repo → Settings → Pages → *Build and deployment* → Source: **GitHub Actions**.
-- **Qué incluye:** ambos juegos completos (se ejecutan en el navegador), datos y verificaciones empaquetados. Partidas, historial y mejor récord se guardan en el `localStorage` de cada dispositivo.
-- **Qué no incluye en Pages:** las rutas opcionales `/api/data/*` (necesitan servidor). Si algún día quieres usarlas con claves, el mismo repo despliega sin cambios en Vercel o Netlify (`vercel.json` incluido; build `npm run build`).
-- **CI:** `.github/workflows/ci.yml` (typecheck, tests, validate:data, build) en cada push/PR.
+- **Producción:** Vercel → **https://legends-lab.vercel.app/** (plan Hobby gratuito). Proyecto conectado a GitHub: cada push a `main` despliega automáticamente; ramas/PR generan previews.
+- Framework Next.js, build `npm run build`, sin variables de entorno obligatorias. Las claves opcionales (`BALLDONTLIE_API_KEY`, …) van en Vercel → Settings → Environment Variables, nunca con prefijo `NEXT_PUBLIC_`.
+- Datos y verificaciones van empaquetados en el build: las partidas no llaman a APIs. Partidas/historial en `localStorage` del dispositivo.
+- GitHub Pages queda como espejo opcional manual (`.github/workflows/pages.yml`, `workflow_dispatch`).
+- CI: `.github/workflows/ci.yml` (typecheck, tests, validate:data, build) en cada push/PR.
 
 ## Sports Data Providers
 

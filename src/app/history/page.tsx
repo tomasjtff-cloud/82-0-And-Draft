@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { KEYS, load, save, type HistoryEntry } from "@/lib/storage";
+import { QuintetModal } from "@/components/nba/QuintetModal";
+import type { NbaTeamSnapshot } from "@/types/nba";
 
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState<"all" | "nba" | "football">("all");
+  const [snap, setSnap] = useState<NbaTeamSnapshot | null>(null);
   useEffect(() => setItems(load<HistoryEntry[]>(KEYS.history, [])), []);
   const shown = items.filter((i) => filter === "all" || i.game === filter);
   return (
@@ -29,10 +32,12 @@ export default function HistoryPage() {
             <div className="text-right text-xs text-muted">
               <div>{new Date(h.date).toLocaleString("es-ES")}</div>
               <div>{h.difficulty} · <span className="font-mono">{h.seed}</span></div>
+              {h.nba && <button className="btn btn-sm mt-1" onClick={() => setSnap(h.nba!)} data-testid="history-quintet">Ver quinteto</button>}
             </div>
           </div>
         ))}
       </div>
+      <QuintetModal open={!!snap} onClose={() => setSnap(null)} snap={snap} />
     </div>
   );
 }

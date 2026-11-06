@@ -8,11 +8,14 @@ import { VerifyBadge } from "@/components/common/VerifyBadge";
 const fmtPct = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}`);
 const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(1));
 
+/** Tier scale (v2): 95-99 leyenda · 90-94 superestrella · 85-89 all-star · 77-84 titular · 68-76 rotación · 55-67 suplente. */
 export function tierOf(ovr: number) {
-  if (ovr >= 90) return { name: "LEGEND", ring: "from-[#ffe08a] via-nba to-[#7a2a00]", text: "text-nba-2" };
-  if (ovr >= 82) return { name: "ALL-STAR", ring: "from-[#f7e08f] via-[#c9a23c] to-[#5b4510]", text: "text-gold-2" };
-  if (ovr >= 74) return { name: "STARTER", ring: "from-[#eef1f5] via-[#9aa3ae] to-[#4b525c]", text: "text-text" };
-  return { name: "ROLE", ring: "from-[#e9b48a] via-[#a8693c] to-[#4a2810]", text: "text-[#e9b48a]" };
+  if (ovr >= 95) return { name: "LEYENDA", ring: "from-[#fff3c4] via-nba to-[#7a2a00]", text: "text-nba-2" };
+  if (ovr >= 90) return { name: "SUPERESTRELLA", ring: "from-[#ffe08a] via-[#ff8a3d] to-[#5b2a00]", text: "text-nba-2" };
+  if (ovr >= 85) return { name: "ALL-STAR", ring: "from-[#f7e08f] via-[#c9a23c] to-[#5b4510]", text: "text-gold-2" };
+  if (ovr >= 77) return { name: "TITULAR", ring: "from-[#eef1f5] via-[#9aa3ae] to-[#4b525c]", text: "text-text" };
+  if (ovr >= 68) return { name: "ROTACIÓN", ring: "from-[#e9b48a] via-[#a8693c] to-[#4a2810]", text: "text-[#e9b48a]" };
+  return { name: "SUPLENTE", ring: "from-[#8d94a0] via-[#5c6370] to-[#2b2f36]", text: "text-muted" };
 }
 
 interface Props {
@@ -90,7 +93,7 @@ export function NbaCardView({ card, placeable = [], disabledReason, onPick, comp
               <p className="mt-1 text-[10px] text-muted">Etapa en el equipo (Wikidata): {card.check.spell.start ?? "?"} → {card.check.spell.end ?? "…"}</p>
             )}
             <p className="mt-1 text-[10px] leading-snug text-dim" title={card.source}>
-              Por partido: curación manual · GP {card.gp ?? "—"} · Ajuste época ×{card.ratings.eraAdjustment}
+              Impacto est. {card.ratings.impact > 0 ? "+" : ""}{card.ratings.impact}/100 · Por partido: curación manual · GP {card.gp ?? "—"} · Ajuste época ×{card.ratings.eraAdjustment}
               {est.size > 0 && " · * atributo estimado (dato no registrado)"}
               {card.check.raptor && " · Métricas avanzadas: FiveThirtyEight (CC BY 4.0)"}
             </p>

@@ -3,9 +3,7 @@
 _Última actualización: 2026-11-06_
 
 ## Estado del deployment (2026-11-06)
-- Plataforma elegida: **GitHub Pages** (export estático, gratis). Vercel se descartó en esta sesión porque el token guardado no se aplicó; el repo sigue siendo compatible con Vercel/Netlify.
-- Workflow `pages.yml`: build y tests OK; requiere activar Pages una vez (Settings → Pages → Source: GitHub Actions).
-- E2E completo verificado contra el export estático servido bajo `/82-0-And-Draft/`.
+- Producción en Vercel: https://legends-lab.vercel.app/ (auto-deploy desde `main`). GitHub Pages: espejo manual opcional.
 
 ## Completado
 - [x] Fase 1 — Base: Next.js 15 + TS + Tailwind 4 + Motion, sistema visual, landing, tests, docs.
@@ -17,11 +15,14 @@ _Última actualización: 2026-11-06_
 - [~] Fase 6 — Pulido: animaciones, reduced motion, responsive verificado a 390 px. Pendiente: sonidos, inglés, banquillo.
 - [x] Fase 7 — Verificación: 33 tests unitarios/integración, build de producción, e2e smoke (NBA + fútbol ruleta/quick sim + FUT/live) sin errores de consola.
 
+- [x] V2 (2026-11-06): pools NBA sin duplicados, ratings v2 calibrados con RAPTOR, modelo de equipo recalibrado, liga 31 equipos + playoffs, box scores y estadísticas simuladas, química explicable con vista previa, VER MI QUINTETO (draft/resultados/historial/recarga), rediseño móvil NBA, Monte Carlo de fútbol en Web Worker.
+
 ## Pendiente (prioridad)
 1. Verificar medias por partido NBA (PPG/RPG…) con una fuente con licencia (538 no las incluye; BALLDONTLIE de pago). 
 1b. **Verificación de datos con API**: ejecutar `scripts/import-nba.ts` con clave y plan adecuado; revisar diffs; marcar filas `api-verified`.
 2. Importador de fútbol (football-data / API-Football) para plantillas recientes; histórico anterior a ~2010 requerirá fuentes adicionales con licencia apropiada.
-3. Banquillo opcional de 5 (rotaciones/fatiga) — el modelo de fatiga ya existe, falta UI + uso en `season.ts`.
+3. NBA: play-in (7-10) y fatiga en playoffs; ratings v2 dependen de medias por partido curadas a mano (verificar con fuente con licencia).
+3b. Banquillo opcional de 5 (rotaciones/fatiga) — el modelo de fatiga ya existe, falta UI + uso en `season.ts`.
 4. Soporte de inglés (diccionario i18n).
 5. Ampliar combinaciones finas: NBA franquicia-década con <3 cartas (ver `npm run validate:data`), más clubes de fútbol (Everton, Leeds, Forest 70-80s, Roma, Lazio, Sevilla, PSV…).
 6. Sonidos opcionales con control de volumen.

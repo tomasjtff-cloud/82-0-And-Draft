@@ -232,7 +232,7 @@ export function evaluateNbaTeam(lineup: Partial<Record<NbaPos, NbaCard>>, fitSen
   });
 
   const base = (overall - TEAM_OVR_PIVOT) * TEAM_OVR_SLOPE + (offense - 80) * 0.06 + (defense - 65) * 0.06;
-  const net = Math.round((base + fitAdjust) * 10) / 10;
+  const net = cards.length ? Math.round((base + fitAdjust) * 10) / 10 : 0;
 
   const labeled: [string, number][] = [
     ["Ataque", offense], ["Defensa", defense], ["Creación", playmaking], ["Rebote", rebounding],

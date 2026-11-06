@@ -23,6 +23,7 @@ import { StatBar } from "@/components/common/StatBar";
 import { FbCardView } from "@/components/football/FbCardView";
 import { FormationPreview, Pitch } from "@/components/football/Pitch";
 import { SeasonView } from "@/components/football/SeasonView";
+import { FootballMonteCarloPanel } from "@/components/football/MonteCarloPanel";
 
 type Phase = "setup" | "draft" | "squad" | "season";
 interface Config { difficulty: Difficulty; clubId: string; replacedClubId: string; formationId: string; mode: DraftMode }
@@ -287,6 +288,7 @@ export function FootballGame() {
                 <button className="btn btn-gold px-6 py-4 text-base" disabled={busy} onClick={() => beginSeason(false)} data-testid="fb-quick-sim">{busy ? "Simulando…" : "Quick sim · temporada completa"}</button>
                 <button className="btn px-6 py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">Live season · jornada a jornada</button>
               </div>
+              <FootballMonteCarloPanel user={{ clubId: config.clubId, name: userName, rating: ratings.ovr, att: ratings.att, def: ratings.def, replacedClubId: config.replacedClubId }} difficulty={config.difficulty} />
               {inspected && <div className="max-w-xs"><FbCardView card={inspected} /></div>}
             </motion.section>
           )}

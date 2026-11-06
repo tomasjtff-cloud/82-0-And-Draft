@@ -81,3 +81,36 @@ Parámetros explícitos (`lib/core/difficulty.ts`): boost de rivales, σ de marg
 | football-data.org | Cliente preparado | Free: 12 competiciones, ~10 req/min, histórico limitado |
 | API-Football | Cliente preparado | Free: 100 req/día; temporadas antiguas limitadas |
 | Transfermarkt | Solo referencia manual | Sin API pública; no se hace scraping |
+
+
+## NBA v2 — ratings, química, liga, playoffs y estadísticas
+
+### Ratings (55–99)
+1. **Features** (`nba-features.ts`): puntos, rebotes, asistencias, robos y tapones normalizados al entorno moderno (ritmo, eficiencia ofensiva de la liga, rebotes disponibles); eFG% estimado (FG% + 0,5·3PM/FGM, con FTM ≈ 19 % de los puntos porque el dataset no tiene FTA) relativo a la liga de esa temporada; reputación defensiva; triples por partido.
+2. **Modelo de impacto**: regresión lineal ridge (λ=2, ponderada por minutos) del RAPTOR total real de FiveThirtyEight sobre esas features en 537 temporadas verificadas → R² 0,60, RMSE 1,77 (`scripts/calibrate-nba.ts` → `nba-calibration.json`).
+3. **Corrección de varianza**: la regresión encoge los extremos; la predicción se re-escala por 1/√R² alrededor de la media para que las leyendas fuera del rango de 538 (pre-1977, 2022+) no queden comprimidas.
+4. **Mezcla con dato real**: si la temporada tiene RAPTOR (≥500 min), impacto = w·RAPTOR + (1−w)·predicción con w = 0,5·min(1, MP/2500).
+5. **Escala**: impacto → OVR por nodos lineales (−3→64, 0→75, 2→81, 4→86, 6→91, 8→94,5, 10→96,8, 12→98,5, 14→99). OVR final = 0,62·impacto + 0,38·índice de producción (volumen estadístico), recortado a 55–99.
+6. Causa de los casos reportados: el modelo anterior usaba FG% crudo (castiga a tiradores de 3 como LaMelo) y un ajuste de rebotes por época que penalizaba a pívots de los 90 (Ewing). Ahora: Ewing 89-90 = 90, 93-94 = 87; LaMelo 22-23 = 77 (su impacto real esa temporada fue modesto: 41 % en tiros de campo en 36 partidos).
+
+### Modelo de equipo
+net = (OVR medio − 79) + 0,06·(ataque−80) + 0,06·(defensa−65) + Σ ajustes de encaje (× sensibilidad de dificultad). Calibrado para que subir todos los OVR no infle los récords (tests en `tests/unit/nba-v2.test.ts`).
+
+### Química NBA (explicable)
+`evaluateNbaTeam().fit` devuelve términos con estado `bonus | ok | pending | penalty` y su valor en puntos de net:
+- Tiro y espaciado: <2 tiradores (tiro ≥62) → −1,6 por cada uno que falte; 3 tiradores +0,5; ≥4 +1.
+- Creación: mejor creador <62 → −1,8; ≥85 → +0,5.
+- Protección del aro: <55 → −1,8; ≥85 → +0,5.
+- Rebote medio <48 → −1,2. Defensa media <50 → −1,2.
+- Un solo balón: ≥3 anotadores de ≥26 pts ajustados → −1,1 por cada uno por encima de 2.
+- Posición secundaria: −0,6 por jugador.
+Las necesidades que aún pueden cubrirse quedan "pending" (sin penalizar) hasta completar el quinteto. Química = 70 + 8·Σ. No hay bonus por franquicia compartida ni por fama. `previewPick()` evalúa el equipo antes/después con el mismo modelo.
+
+### Liga y playoffs
+31 equipos (30 franquicias + el tuyo en el Oeste). Calendario exacto de 82 partidos por equipo: 2 vs cada equipo de la otra conferencia; Este 4×8 + 3×6 (diseño circulante); Oeste 3–4 vs cada rival con grafo de "4 partidos" de grados prescritos (Havel–Hakimi aleatorizado). Todos los partidos usan el mismo modelo de margen normal. Clasificación por victorias → enfrentamiento directo → diferencial → sorteo. Playoffs: 8 por conferencia (sin play-in), 1-8/4-5/2-7/3-6, mejor de 7 con 2-2-1-1-1; Finals con ventaja para el mejor récord.
+
+### Estadísticas simuladas
+El marcador se decide primero; `boxscore.ts` reparte esos puntos exactos entre los 5 titulares y un banquillo genérico (≈0,33 pts/min) según puntos por 36 normalizados × minutos, con ruido; los jugadores a los que se pide más que su volumen histórico pierden algo de eficiencia (y ganan si comparten balón con más estrellas). Tiros: TL ≈ 19 % de los puntos, triples según su proporción histórica, FGA/3PA/FTA a partir de sus porcentajes ± ruido. Rebotes, asistencias (≈60 % de canastas), robos y tapones de equipo por posesiones, repartidos por perfil × minutos. Invariantes: Σ puntos = marcador, Σ minutos = 240 + 25·prórrogas, 2·FGM+3PM+FTM = PTS.
+
+## Fútbol — Monte Carlo
+Cada iteración i ejecuta `simulateRest(createSeason(seed#fbmc i))`: el mismo motor del Quick Sim (sorteos, calendario, fatiga, localía, química/formación vía ATT/DEF del XI, dificultad). Se registran posición, puntos, GF/GA y la ronda más profunda en cada copa. Probabilidades = frecuencias k/N con intervalo de Wilson al 95 % (con k=0 el límite superior ≈ 3/N). Corre en un Web Worker en lotes de 10–25 temporadas con progreso, cancelación (resultados parciales) y fallback en el hilo principal. Rendimiento: ~12 ms por temporada en escritorio (sorteo de Champions constructivo).

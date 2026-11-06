@@ -1,7 +1,6 @@
 name: Deploy to GitHub Pages
 on:
-  push:
-    branches: [main]
+  # Production is Vercel (auto-deploy from main). Pages is an optional manual mirror.
   workflow_dispatch:
 permissions:
   contents: read

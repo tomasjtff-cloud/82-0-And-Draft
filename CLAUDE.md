@@ -64,17 +64,29 @@ tests/unit/*.test.ts · tests/e2e/smoke.mjs
 - Ejecutar `npm run validate:data` y `npm test`. Las combinaciones franquicia/club–década aparecen automáticamente en las ruletas.
 
 ## Decisiones técnicas clave
-- **NBA ratings**: normalización por ritmo y entorno ofensivo de cada temporada (`nba-context.ts`) → índice tipo box-score → OVR 55–99. Rating de equipo con rendimientos decrecientes en ataque y penalizaciones de encaje (tiro, creación, aro, rebote, exceso de anotadores, posición secundaria) escaladas por dificultad. Net rating ≈ `(OVR−71.5)·0.83 + ...`.
-- **NBA partido**: margen ~ Normal(μ, σ≈12.5) con μ = net propio − (net rival + boost dificultad) ± 1.6 localía − fatiga b2b, forma de temporada N(0,0.8). Calibración: quinteto top ≈ 74 victorias NORMAL, P(82-0) ≈ 10⁻⁴…10⁻²; quinteto All-Star ≈ 50; role players ≈ 15.
+- **NBA ratings**: ver sección “NBA v2”. Escala: 95–99 leyenda, 90–94 superestrella, 85–89 all-star, 77–84 titular, 68–76 rotación, 55–67 suplente.
+- **NBA partido**: margen ~ Normal(μ, σ≈12.5) con μ = net propio − (net rival + boost dificultad) ± 1.6 localía − fatiga b2b, forma de temporada N(0,0.8). Calibración v2 (Normal): leyendas OVR 97 ≈ 73,5 victorias, P(82-0) analítica ≈ 1,6·10⁻⁴; OVR 83 ≈ 49; OVR 78 ≈ 37; OVR 72 ≈ 16.
 - **Fútbol partido**: Poisson independiente, λ = 1.36·exp(0.042·(ATT−DEF_rival) ± 0.12 localía), forma N(0,1.6) por equipo, fatiga por congestión (×dificultad para el usuario). Prórroga λ/3. Penales simulados.
 - **Química**: club 2/4/6, nación 2/4/7, liga 3/5/8 → +1/+2/+3 (máx 3 por jugador, 33 equipo), 0 fuera de posición (encaje <0.9), leyendas (≥90) mínimo 1, capitán +1. Efecto: (chem/33−0.6)·4 sobre ATT/DEF.
 - **Elegibilidad de draft**: encaje posicional ≥ 0.9 (`DRAFT_FIT_MIN`).
-- **Champions**: 4 bombos de 9 por rating; cada equipo 2 rivales por bombo (1 casa/1 fuera), sin compatriotas, máx. 2 por país; 8 jornadas por emparejamientos perfectos con DFS. Playoffs 9–24, bracket R16 por pares de cabezas de serie, mejor clasificado cierra en casa.
+- **Champions**: 4 bombos de 9 por rating; cada equipo 2 rivales por bombo (1 casa/1 fuera), sin compatriotas, máx. 2 por país; sorteo constructivo greedy por par de bombos con reintentos; 8 jornadas por emparejamientos perfectos con DFS. Playoffs 9–24, bracket R16 por pares de cabezas de serie, mejor clasificado cierra en casa.
 - **Copas**: FA Cup sin replays (prórroga+penales; SF y F neutrales). Carabao: penales directos hasta cuartos; SF ida/vuelta con prórroga en la vuelta; final neutral.
 - Usuario como club real: su XI sustituye la plantilla. Fantasy FC sustituye a un club PL elegido (siguen 20). El usuario siempre juega la Champions (regla fantástica, reemplaza al inglés más débil).
 
 ## Deployment
-GitHub Pages (export estático, `.github/workflows/pages.yml`): push a `main` = producción en https://tomasjtff-cloud.github.io/82-0-And-Draft/. `GITHUB_PAGES=true` activa `output: export` + basePath; el workflow elimina `src/app/api` antes del build. Probar el export localmente: `GITHUB_PAGES=true npm run build`, servir `out/` bajo `/82-0-And-Draft/`, y `BASE_URL=... npm run e2e`.
+**Producción: Vercel** — https://legends-lab.vercel.app/ (integración Git: push a `main` = deploy de producción). Sin variables obligatorias.
+GitHub Pages (`.github/workflows/pages.yml`) queda solo como espejo manual (`workflow_dispatch`): `GITHUB_PAGES=true` activa `output: export` + basePath.
+
+## NBA v2 (resumen técnico)
+- **Ratings**: `src/lib/ratings/nba-features.ts` (features con eFG estimado) + `scripts/calibrate-nba.ts` (regresión ridge ponderada por minutos contra RAPTOR → `nba-calibration.json`). OVR = 0.62·impactToOvr(impacto) + 0.38·producción. Impacto = predicción ajustada en varianza (÷√R²) mezclada con RAPTOR real (peso 0.5·min(1, MP/2500)).
+- **Equipo**: net = (OVR medio − 79)·1.0 + (ataque−80)·0.06 + (defensa−65)·0.06 + Σ ajustes de encaje. Química = 70 + 8·Σ ajustes (`evaluateNbaTeam().fit`).
+- **Pools del draft**: un jugador por franquicia+década (mejor temporada: OVR → impacto → PJ → más reciente); otras temporadas seleccionables (`versionsFor`).
+- **Liga**: 31 equipos (30 franquicias + "YOU" en el Oeste), 82 partidos exactos cada uno (`league.ts`). Playoffs top-8 por conferencia, mejor de 7 (2-2-1-1-1). RNG separados: `nba-season:`, `nba-league:`, `nba-playoffs:`.
+- **Box scores**: `boxscore.ts` reparte exactamente el marcador entre 5 titulares + banquillo (invariantes testeadas).
+- **Persistencia**: `ll:nba:last:v1` (draft + semilla → la temporada se recalcula), historial con `nba: NbaTeamSnapshot` (entradas antiguas siguen siendo válidas sin snapshot).
+
+## Fútbol Monte Carlo
+`src/features/football-simulation/monte-carlo.ts` (motor real, semillas `${seed}#fbmc${i}`, IC Wilson) + `mc.worker.ts` (lotes, progreso, cancelación) + `src/hooks/useFootballMonteCarlo.ts`.
 
 ## Estado / siguientes pasos
 Ver `ROADMAP.md`. Al terminar una sesión: actualizar ROADMAP.md y CHANGELOG.md, commit descriptivo, push y verificar.

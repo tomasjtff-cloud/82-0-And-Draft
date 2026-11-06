@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Legends Lab",
   description: "NBA 82-0 Challenge + Football Ultimate Draft & Season Simulator. Proyecto personal.",
 };
-export const viewport: Viewport = { themeColor: "#06070a", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#06070a", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

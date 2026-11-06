@@ -133,3 +133,19 @@ export interface NbaSeasonResult {
   playoffs?: { series: PlayoffSeries[]; outcome: PlayoffOutcome; champion: string; userSeed: number | null };
   stats?: { regular: PlayerTotals[]; playoffs: PlayerTotals[] };
 }
+
+/** Everything needed to show "VER MI QUINTETO" later (history, reloads). Values frozen at draft time. */
+export interface NbaTeamSnapshot {
+  version: 2;
+  seed: string;          // season seed (re-simulating with it reproduces the season)
+  draftSeed: string;
+  difficulty: Difficulty;
+  players: { pos: NbaPos; id: string; name: string; teamName: string; season: string; ovr: number }[];
+  teamOvr: number;
+  chemistry: number;
+  net: number;
+  strengths: string[];
+  weaknesses: string[];
+  record?: { wins: number; losses: number };
+  playoff?: string;
+}
