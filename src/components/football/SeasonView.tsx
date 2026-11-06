@@ -1,5 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { FinalPreview, FinalReport, FinalsList } from "./Finals";
+import { QuadrupleCelebration } from "./QuadrupleCelebration";
+import { userFinals } from "@/features/football-simulation/finals";
+import { diffName } from "@/lib/core/difficulty";
+import { T } from "@/lib/i18n";
+import { seasonAwards } from "@/features/football-simulation/awards";
+import { SeasonAwardsView } from "./SeasonAwardsView";
+import { TACTICS } from "@/features/football-simulation/tactics";
 import { motion } from "motion/react";
 import type { CompId, Match, Tie } from "@/types/football";
 import { plTable, summarize, uclTable, nextUserFixture, isSeasonDone, type SeasonState, type TrophyResult } from "@/features/football-simulation/season";
@@ -18,10 +26,10 @@ import type { XiSource } from "./XiModal";
 
 type Tab = "summary" | "xi" | "players" | "mine" | "pl" | "ucl" | "fa" | "efl" | "mc";
 const STATUS: Record<TrophyResult["status"], { label: string; cls: string }> = {
-  won: { label: "WON", cls: "bg-gold text-black" },
-  "runner-up": { label: "RUNNER-UP", cls: "bg-white/80 text-black" },
-  eliminated: { label: "ELIMINATED", cls: "bg-loss/80 text-white" },
-  "not-qualified": { label: "NOT QUALIFIED", cls: "bg-white/10 text-muted" },
+  won: { label: T.trophy.won, cls: "bg-gold text-black" },
+  "runner-up": { label: T.trophy.runnerUp, cls: "bg-white/80 text-black" },
+  eliminated: { label: T.trophy.eliminated, cls: "bg-loss/80 text-white" },
+  "not-qualified": { label: T.trophy.notQualified, cls: "bg-white/10 text-muted" },
   "in-progress": { label: "EN JUEGO", cls: "bg-white/10 text-text" },
 };
 const COMP_KEY: Record<CompId, string> = { PL: "pl", UCL: "ucl", FA: "fa", EFL: "efl" };
@@ -31,6 +39,14 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
   xi?: XiSource | null; headerExtra?: React.ReactNode; mcSlot?: React.ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>("summary");
+  const [finalOpen, setFinalOpen] = useState<Match | null>(null);
+  const finalsCount = userFinals(s).length;
+  const [seenFinals, setSeenFinals] = useState(finalsCount);
+  useEffect(() => {
+    if (finalsCount > seenFinals && live) setFinalOpen(userFinals(s)[finalsCount - 1]);
+    setSeenFinals(finalsCount);
+  }, [finalsCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  const xiChem = useMemo(() => (xi ? computeChemistry(FORMATION_BY_ID[xi.formationId], lineupOf(xi.lineup), leagueOf, xi.captainId, !!xi.rules?.extended).total : undefined), [xi]);
   const done = isSeasonDone(s);
   const sum = useMemo(() => summarize(s), [s]);
   const name = (id: string) => s.teams[id]?.name ?? id;
@@ -42,17 +58,12 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
   return (
     <div className="space-y-6" data-testid="fb-season">
       <Celebration active={sum.quadruple} colors={["#d9b45a", "#f3dc94", "#ffffff", "#11502f"]} durationMs={6000} />
-      {sum.quadruple && (
-        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="panel border-gold p-8 text-center">
-          <div className="font-display text-6xl text-gold md:text-8xl">THE QUADRUPLE</div>
-          <p className="mt-2 text-muted">Premier League, Champions League, FA Cup y Carabao Cup. Temporada inmortal.</p>
-        </motion.div>
-      )}
+      {sum.quadruple && <QuadrupleCelebration s={s} chem={xiChem} onOpenXi={() => setTab("xi")} />}
 
       <section className="panel p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
-            <div className="font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Temporada 2026/27 · {s.difficulty} · semilla <span className="font-mono normal-case">{s.seed}</span></div>
+            <div className="font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Temporada 2026/27 · {diffName(s.difficulty)} · semilla <span className="font-mono normal-case">{s.seed}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-gold transition-all" style={{ width: `${progress}%` }} /></div>
             <div className="mt-1 text-xs text-muted">{done ? "Temporada finalizada" : `Próximo evento: ${s.events[s.cursor].label} · ${COMP_NAME[s.events[s.cursor].comp]} · ${s.events[s.cursor].date}`}</div>
           </div>
@@ -84,6 +95,8 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
         )}
       </section>
 
+      {live && <FinalPreview s={s} onOpenXi={() => setTab("xi")} />}
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="fb-trophies">
         {sum.trophies.map((t, i) => (
           <motion.button key={t.comp} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
@@ -105,7 +118,9 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
         ))}
       </div>
 
+      {tab === "summary" && <FinalsList s={s} onOpen={setFinalOpen} />}
       {tab === "summary" && <SummaryTab s={s} xi={xi ?? null} narrative={sum.narrative} done={done} />}
+      <FinalReport s={s} m={finalOpen} onClose={() => setFinalOpen(null)} onOpenXi={() => { setFinalOpen(null); setTab("xi"); }} />
       {tab === "xi" && <XiTab xi={xi ?? null} />}
       {tab === "players" && <FbPlayerStatsView s={s} />}
       {tab === "mc" && (mcSlot ?? <p className="text-sm text-muted">Monte Carlo no disponible.</p>)}
@@ -287,6 +302,7 @@ function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource |
     const w = xi.rules?.weight ?? 1;
     return { chem: chem.total, effect: chemistryEffect(chem.total, sens, w), r: teamRatings(fm, lc, chem.total, sens, w), fm, lc, perSlot: chem.perSlot };
   }, [xi]);
+  const awardsV4 = useMemo(() => (done ? seasonAwards(s) : null), [s, done]);
   const topScorers = [...rows].filter((r) => r.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 3);
   return (
     <section className="space-y-4" data-testid="fb-summary">
@@ -299,6 +315,7 @@ function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource |
           </div>
           <ul className="mt-3 space-y-1 text-sm text-muted">{narrative.map((n) => <li key={n}>· {n}</li>)}</ul>
           {s.notes.length > 0 && <ul className="mt-3 space-y-1 text-xs text-gold-2">{s.notes.map((n) => <li key={n}>⚑ {n}</li>)}</ul>}
+          <p className="mt-2 text-xs" data-testid="fb-tactic-used">Táctica: <b>{TACTICS[s.tactic?.id ?? "balanced"].icon} {TACTICS[s.tactic?.id ?? "balanced"].name}</b>{s.tactic ? ` · encaje ${s.tactic.fit > 0 ? "+" : ""}${s.tactic.fit.toFixed(2)}` : ""}</p>
         </div>
         {xiInfo && (
           <div className="panel p-4">
@@ -315,6 +332,7 @@ function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource |
           <div className="rounded-xl bg-white/5 px-3 py-2"><div className="text-[10px] uppercase text-muted">Máximo asistidor</div><div className="font-cond text-lg font-bold uppercase">{awards.topAssister?.name ?? "—"}</div><div className="font-mono text-xs">{awards.topAssister?.assists ?? 0} asistencias</div></div>
         </div>
       )}
+      {done && awardsV4 && <SeasonAwardsView a={awardsV4} />}
       <SeasonHighlights s={s} />
       <p className="text-[11px] text-dim">Resultados del videojuego generados con un modelo probabilístico (Poisson). No son predicciones deportivas reales.</p>
     </section>

@@ -36,3 +36,7 @@ export const DIFFICULTY_EXPLAIN: Record<Difficulty, string> = {
   NORMAL: "Parámetros de referencia del motor.",
   HARD: "Rivales más fuertes, más castigo por desequilibrios del equipo y más fatiga en tramos cargados.",
 };
+
+/** Spanish display names (internal ids stay EASY/NORMAL/HARD). */
+export const DIFFICULTY_NAME: Record<string, string> = { EASY: "Fácil", NORMAL: "Normal", HARD: "Difícil" };
+export const diffName = (d: string) => DIFFICULTY_NAME[d] ?? d;

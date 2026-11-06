@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { T } from "@/lib/i18n";
 import { motion } from "motion/react";
 import type { Difficulty } from "@/lib/core/difficulty";
 import { DIFFICULTY_PARAMS } from "@/lib/core/difficulty";
@@ -7,7 +8,7 @@ import { randomSeed } from "@/lib/core/rng";
 import { FORMATIONS, FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUBS, HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { FANTASY_ID, PL_CLUBS } from "@/lib/data/football/world";
-import { chemRulesFor, chemistryBreakdown, chemistryEffect, type ChemRules, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
+import { slotFit, chemRulesFor, chemistryBreakdown, chemistryEffect, type ChemRules, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
 import { addHistory, KEYS, load, remove, save } from "@/lib/storage";
 import { animMs, useSettings } from "@/hooks/useSettings";
 import type { DraftMode, FbDraftState, FbPlayerSeason } from "@/types/football";
@@ -17,12 +18,17 @@ import {
   respinClub, respinEra, slotById, swapSlots,
 } from "./engine";
 import { createSeason, isSeasonDone, plTable, simulateRest, stepSeason, stepToNextUserMatch, summarize, type SeasonState } from "@/features/football-simulation/season";
-import { buildFbSnapshot, userTeamInput } from "./squad";
+import { buildFbSnapshot, buildSquad, userTeamInput } from "./squad";
+import { recordDraft, recordSeason } from "@/lib/progress/store";
+import { fbSeasonRecord } from "@/lib/progress/summarize";
+import { tacticPreview, type TacticId } from "@/features/football-simulation/tactics";
+import { TacticPicker } from "@/components/football/TacticPicker";
 import { DifficultySelector } from "@/components/common/DifficultySelector";
 import { Reel } from "@/components/common/Reel";
 import { FbCandidateRow, FbCardView } from "@/components/football/FbCardView";
 import { FbPlayerSheet } from "@/components/football/FbPlayerSheet";
 import { ChemWhy } from "@/components/football/ChemWhy";
+import { ActionBar } from "@/components/common/ActionBar";
 import { Sheet } from "@/components/common/Sheet";
 import { XiButton, XiModal, type XiSource } from "@/components/football/XiModal";
 import { ChemLegend, FormationPreview, Pitch } from "@/components/football/Pitch";
@@ -30,7 +36,7 @@ import { SeasonView } from "@/components/football/SeasonView";
 import { FootballMonteCarloPanel } from "@/components/football/MonteCarloPanel";
 
 type Phase = "setup" | "draft" | "squad" | "season";
-interface Config { difficulty: Difficulty; clubId: string; replacedClubId: string; formationId: string; mode: DraftMode }
+interface Config { difficulty: Difficulty; clubId: string; replacedClubId: string; formationId: string; mode: DraftMode; tactic?: TacticId }
 interface Session { phase: Phase; config: Config; draft: FbDraftState | null; season: SeasonState | null; live: boolean; /** rules the current season was played with */ rules?: ChemRules }
 
 const DEFAULT_CONFIG: Config = { difficulty: "NORMAL", clubId: "ARS", replacedClubId: "HUL", formationId: "4-3-3", mode: "roulette" };
@@ -49,6 +55,10 @@ export function FootballGame() {
   const [showXi, setShowXi] = useState(false);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [compareId, setCompareId] = useState<string | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [comparePair, setComparePair] = useState<[string, string] | null>(null);
+  const [sortKey, setSortKey] = useState<"ovr" | "chem" | "fit">("ovr");
+  const [pitchFull, setPitchFull] = useState(false);
   const [chemMode, setChemMode] = useState(false);
   const [listOpen, setListOpen] = useState(true);
   const [query, setQuery] = useState("");
@@ -78,6 +88,13 @@ export function FootballGame() {
   const rules: ChemRules = session.phase === "season" && session.season ? (session.rules ?? { extended: false, weight: 1, version: 1 }) : chemRulesFor(draft?.mode ?? config.mode);
   const chemW = rules.weight;
   const ratings = useMemo(() => teamRatings(formation, lineupCards, chem.total, DIFFICULTY_PARAMS[config.difficulty].fbFitSensitivity, chemW), [formation, lineupCards, chem, config.difficulty, chemW]);
+  // progress: a completed XI counts as a completed draft (best chemistry reached is kept)
+  const draftDone = session.phase === "squad" && !!session.draft && isFbComplete(session.draft);
+  useEffect(() => {
+    if (!draftDone || !session.draft) return;
+    const d = session.draft;
+    recordDraft({ game: "fb", id: d.seed, date: new Date().toISOString(), chem: chem.total, mode: d.mode, nations: new Set(Object.values(d.lineup).map((id) => FB_CARD_BY_ID[id]?.nation)).size });
+  }, [draftDone, session.draft, chem.total]);
   const userName = config.clubId === FANTASY_ID ? "Fantasy FC" : PL_CLUBS.find((c) => c.id === config.clubId)?.name ?? "Mi club";
 
   const apply = (r: { ok: true; state: FbDraftState } | { ok: false; error: string }, phaseIfComplete = true) => {
@@ -98,7 +115,7 @@ export function FootballGame() {
     if (!draft) return;
     setBusy(true);
     setTimeout(() => {
-      let s = createSeason(randomSeed(), config.difficulty, userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, true, rules));
+      let s = createSeason(randomSeed(), config.difficulty, userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, true, rules, config.tactic ?? "balanced"));
       if (!live) s = simulateRest(s);
       set({ season: s, phase: "season", live, rules });
       if (!live) record(s);
@@ -110,7 +127,8 @@ export function FootballGame() {
     const won = sum.trophies.filter((t) => t.status === "won").map((t) => t.comp);
     const row = plTable(s).find((r) => r.team === s.userId)!;
     addHistory({ game: "football", seed: s.seed, difficulty: s.difficulty, title: sum.quadruple ? "QUADRUPLE" : won.length ? won.join(" + ") : `${sum.plPosition}º PL`, detail: `${userName} · ${draft?.formationId} · OVR ${ratings.ovr}`, score: won.length,
-      ...(draft ? { football: buildFbSnapshot(draft, s.seed, config.clubId, userName, config.replacedClubId, { plPos: row.pos!, pts: row.pts, trophies: won }, session.rules ?? rules) } : {}) });
+      ...(draft ? { football: buildFbSnapshot(draft, s.seed, config.clubId, userName, config.replacedClubId, { plPos: row.pos!, pts: row.pts, trophies: won }, session.rules ?? rules, s.tactic?.id ?? "balanced") } : {}) });
+    if (draft) recordSeason(fbSeasonRecord(s, draft, { teamName: userName, ovr: ratings.ovr, chem: chem.total }));
   };
   const advance = (fn: (s: SeasonState) => SeasonState) => {
     if (!season) return;
@@ -136,7 +154,7 @@ export function FootballGame() {
   if (session.phase === "setup") {
     return (
       <div className="mx-auto max-w-6xl px-4 py-10">
-        <span className="chip border-gold/50 text-gold-2">Game 2</span>
+        <span className="chip border-gold/50 text-gold-2">{T.games.game2}</span>
         <h1 className="font-display mt-3 text-5xl leading-none md:text-7xl">FOOTBALL <span className="text-gold">ULTIMATE DRAFT</span></h1>
         <p className="mt-3 text-lg">Build your dream XI. <span className="text-muted">Conquer England and Europe.</span></p>
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -170,7 +188,7 @@ export function FootballGame() {
                   </button>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-muted">Re-spins (1 de cada por draft): <b>Ruleta</b> → Club conserva década y posición; Época conserva club y posición. <b>FUT</b> → vuelven a sacar las 5 cartas filtradas por un club o una década al azar.</p>
+              <p className="mt-3 text-xs text-muted">Volver a girar (1 de cada por draft): <b>Ruleta</b> → Club conserva década y posición; Época conserva club y posición. <b>FUT</b> → vuelven a sacar las 5 cartas filtradas por un club o una década al azar.</p>
             </div>
           </div>
           <div className="space-y-6">
@@ -200,7 +218,8 @@ export function FootballGame() {
   const xi: XiSource = { formationId: draft.formationId, lineup: draft.lineup, captainId: draft.captainId, difficulty: config.difficulty, title: userName, rules };
   const sens = DIFFICULTY_PARAMS[config.difficulty].fbFitSensitivity;
   const links = chemistryLinks(formation, lineupCards, leagueOf, rules.extended);
-  const mcUser = userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, false, rules);
+  const tacticPreviews = session.phase === "squad" ? tacticPreview({ rating: ratings.ovr, att: ratings.att, def: ratings.def }, buildSquad(draft.formationId, draft.lineup, draft.captainId, rules.extended), config.difficulty) : [];
+  const mcUser = userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, false, rules, config.tactic ?? "balanced");
   const xiModal = <XiModal open={showXi} onClose={() => setShowXi(false)} xi={Object.keys(draft.lineup).length ? xi : null} />;
 
   /* ───────── SEASON ───────── */
@@ -230,16 +249,25 @@ export function FootballGame() {
   const needSpin = !!spinKey && revealed !== spinKey && !isSquad;
   const filled = Object.keys(draft.lineup).length;
   const previewSlot = needCaptain ? (openCard ? captainSlots(draft, openCard)[0] ?? null : null) : draft.currentSlot;
-  const shownOptions = options.filter((c) => !query.trim() || c.name.toLowerCase().includes(query.trim().toLowerCase()));
   const chemOf = (c: FbPlayerSeason) => (previewSlot ? computeChemistry(formation, { ...lineupCards, [previewSlot]: c }, leagueOf, draft.captainId, rules.extended).perSlot[previewSlot] ?? 0 : undefined);
+  const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const slotPos = previewSlot ? formation.slots.find((x) => x.id === previewSlot)?.pos : undefined;
+  const shownOptions = options.filter((c) => !query.trim() || norm(c.name).includes(norm(query.trim())))
+    .map((c) => ({ c, chem: chemOf(c) ?? 0, fit: slotPos ? slotFit(c, slotPos) : 1 }))
+    .sort((a, b) => (sortKey === "chem" ? b.chem - a.chem : sortKey === "fit" ? b.fit - a.fit : 0) || b.c.ovr - a.c.ovr).map((x) => x.c);
+  const onRowOpen = (id: string) => {
+    if (!compareMode) { setOpenCard(id); return; }
+    if (!compareId || compareId === id) { setCompareId(compareId === id ? null : id); return; }
+    setComparePair([compareId, id]); setOpenCard(compareId);
+  };
   const onPickCard = (c: FbPlayerSeason) => {
-    setOpenCard(null); setCompareId(null); setQuery("");
+    setOpenCard(null); setCompareId(null); setComparePair(null); setCompareMode(false); setQuery("");
     if (needCaptain) { const slots = captainSlots(draft, c.id); if (slots.length === 1) apply(pickCaptain(draft, c.id, slots[0])); else setCaptainPick(c.id); }
     else apply(pickFb(draft, c.id));
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-4 lg:pb-8" style={{ paddingBottom: isSquad ? "max(24px, env(safe-area-inset-bottom))" : "44dvh" }}>
+    <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-4 lg:pb-8" style={{ paddingBottom: isSquad ? "calc(84px + env(safe-area-inset-bottom))" : "calc(44dvh + 64px)" }}>
       <div className="lg:grid lg:grid-cols-[1fr_420px] lg:gap-6">
         <div className="min-w-0 space-y-3">
           <div className="flex items-center gap-2">
@@ -288,11 +316,14 @@ export function FootballGame() {
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)} data-testid="fb-chem-mode">⚗ Química {chem.total}/33</button>
+            <span className="chip font-mono" data-testid="fb-formation-chip">{draft.formationId}</span>
+            <span className="chip font-mono" title="Media del equipo">Media {ratings.ovr || "—"}</span>
+            <button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)} aria-pressed={chemMode} data-testid="fb-chem-mode">⚗ Química {chem.total}/33</button>
+            <button className="btn btn-sm btn-ghost ml-auto" onClick={() => setPitchFull((v) => !v)} aria-pressed={pitchFull} data-testid="fb-pitch-toggle">{pitchFull ? "⤡ Compacto" : "⤢ Completo"}</button>
             {chemMode && <ChemLegend extended={rules.extended} />}
           </div>
-          <div className="mx-auto w-full max-w-md lg:max-w-none">
-            <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? (selected ?? focusSlot) : null} />
+          <div className={`mx-auto w-full lg:max-w-none ${pitchFull ? "max-w-md" : "max-w-[310px] sm:max-w-md"}`}>
+            <Pitch compact={!pitchFull} formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? (selected ?? focusSlot) : null} />
           </div>
           {focusSlot && draft.lineup[focusSlot] && breakdown.slots[focusSlot] && (
             <div className="panel flex items-center gap-3 p-3" data-testid="chem-focus">
@@ -309,7 +340,7 @@ export function FootballGame() {
             <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <div className="panel p-4">
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" data-testid="fb-chemistry">
-                  {[["TEAM OVR", ratings.ovr], ["ATTACK", ratings.attack], ["MIDFIELD", ratings.midfield], ["DEFENSE", ratings.defense], ["CHEMISTRY", `${chem.total}/33`]].map(([k, v]) => (
+                  {[[T.team.ovr, ratings.ovr], [T.team.attack, ratings.attack], [T.team.midfield, ratings.midfield], [T.team.defense, ratings.defense], [T.team.chemistry, `${chem.total}/33`]].map(([k, v]) => (
                     <div key={k as string} className="rounded-xl bg-white/5 px-2 py-2 text-center"><div className="font-cond text-[10px] font-bold tracking-wider text-muted">{k}</div><div className="font-display text-2xl tabular">{v}</div></div>
                   ))}
                 </div>
@@ -324,9 +355,10 @@ export function FootballGame() {
                   <span className="text-xs text-muted">Toca dos jugadores para intercambiarlos. Borde rojo = fuera de posición.</span>
                 </div>
               </div>
+              <TacticPicker previews={tacticPreviews} value={config.tactic ?? "balanced"} onChange={(t) => setConfig({ tactic: t })} />
               <div className="grid gap-2 sm:grid-cols-2">
-                <button className="btn btn-gold py-4 text-base" disabled={busy} onClick={() => beginSeason(false)} data-testid="fb-quick-sim">{busy ? "Simulando…" : "Quick sim · temporada completa"}</button>
-                <button className="btn py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">Live season · jornada a jornada</button>
+                <button className="btn btn-gold py-4 text-base" disabled={busy} onClick={() => beginSeason(false)} data-testid="fb-quick-sim">{busy ? T.sim.simulating : T.sim.quickLong}</button>
+                <button className="btn py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">{T.sim.liveLong}</button>
               </div>
               <FootballMonteCarloPanel user={mcUser} difficulty={config.difficulty} teamLabel={userName} />
 
@@ -336,22 +368,28 @@ export function FootballGame() {
         </div>
 
         {!isSquad && !needSpin && !captainPick && (
-          <aside className="fixed inset-x-0 bottom-0 z-40 flex max-h-[42dvh] flex-col rounded-t-3xl border-t border-line-strong bg-surface/95 shadow-[0_-12px_40px_rgba(0,0,0,.6)] backdrop-blur lg:static lg:z-auto lg:max-h-none lg:rounded-2xl lg:border lg:bg-surface lg:shadow-none"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }} data-testid="fb-drawer">
+          <aside className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex max-h-[42dvh] flex-col lg:bottom-auto rounded-t-3xl border-t border-line-strong bg-surface/95 shadow-[0_-12px_40px_rgba(0,0,0,.6)] backdrop-blur lg:static lg:z-auto lg:max-h-none lg:rounded-2xl lg:border lg:bg-surface lg:shadow-none"
+            data-testid="fb-drawer">
             <button className="flex items-center justify-between gap-2 px-4 pb-2 pt-3 text-left lg:pointer-events-none" onClick={() => setListOpen((v) => !v)} aria-expanded={listOpen}>
               <span className="min-w-0">
                 <span className="mx-auto mb-1 block h-1 w-10 rounded-full bg-white/20 lg:hidden" />
                 <span className="block truncate font-cond text-sm font-bold uppercase tracking-wide">{needCaptain ? "Candidatos a capitán" : draft.mode === "roulette" && club ? `${club.name} · ${draft.spin!.decade} · ${slot?.pos}` : `Cartas para ${slot?.pos}`}</span>
-                <span className="block text-[11px] text-muted">{options.length} carta{options.length === 1 ? "" : "s"} · toca para ver ficha y química · ⇄ para comparar</span>
+                <span className="block text-[11px] text-muted">{compareMode ? (compareId ? "Elige el segundo jugador para comparar" : "Modo comparar: elige dos jugadores") : `${options.length} carta${options.length === 1 ? "" : "s"} · toca para ver ficha, química e impacto`}</span>
               </span>
               <span className="text-muted lg:hidden">{listOpen ? "▼" : "▲"}</span>
             </button>
             {listOpen && (
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3 scrollbar-thin">
-                {options.length > 3 && <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador…" enterKeyHint="search" className="mb-1 w-full rounded-lg border border-line bg-ink px-3 py-2 text-base" data-testid="fb-search" />}
+                <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-1.5 bg-surface/95 px-1 pb-2">
+                  {options.length > 3 && <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador…" enterKeyHint="search" type="search" aria-label="Buscar jugador" className="min-w-0 flex-1 basis-40 rounded-lg border border-line bg-ink px-3 py-2 text-base" data-testid="fb-search" />}
+                  <div role="group" aria-label="Ordenar" className="flex gap-1">
+                    {([["ovr", "OVR"], ["chem", "Química"], ["fit", "Encaje"]] as const).map(([k, l]) => <button key={k} onClick={() => setSortKey(k)} aria-pressed={sortKey === k} className={`chip min-h-[36px] ${sortKey === k ? "border-gold bg-gold/15 text-text" : "text-muted"}`} data-testid={`fb-sort-${k}`}>{l}</button>)}
+                  </div>
+                  <button onClick={() => { setCompareMode((v) => !v); setCompareId(null); }} aria-pressed={compareMode} className={`chip min-h-[36px] ${compareMode ? "border-gold bg-gold/15 text-text" : "text-muted"}`} data-testid="fb-compare-mode">⇄ Comparar jugadores</button>
+                </div>
                 <div className="divide-y divide-line" data-testid="fb-options">
                   {shownOptions.map((c) => (
-                    <FbCandidateRow key={c.id} card={c} ownChem={chemOf(c)} onOpen={() => setOpenCard(c.id)} comparing={compareId === c.id}
+                    <FbCandidateRow key={c.id} card={c} ownChem={chemOf(c)} onOpen={() => onRowOpen(c.id)} comparing={compareId === c.id}
                       onCompare={() => setCompareId(compareId === c.id ? null : c.id)} />
                   ))}
                 </div>
@@ -360,9 +398,10 @@ export function FootballGame() {
           </aside>
         )}
       </div>
-      <FbPlayerSheet card={openCard ? FB_CARD_BY_ID[openCard] : null} compareWith={compareId && compareId !== openCard ? FB_CARD_BY_ID[compareId] : null}
-        formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} fitSensitivity={sens} chemWeight={chemW} extended={rules.extended}
-        pickLabel={needCaptain ? "Capitán" : "Elegir"} onPick={onPickCard} onClose={() => setOpenCard(null)} />
+      <FbPlayerSheet card={openCard ? FB_CARD_BY_ID[openCard] : null}
+        compareWith={comparePair ? FB_CARD_BY_ID[comparePair[1]] : compareId && compareId !== openCard ? FB_CARD_BY_ID[compareId] : null}
+        formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} difficulty={config.difficulty} rules={rules}
+        pickLabel={needCaptain ? "Capitán" : "Elegir"} onPick={onPickCard} onClose={() => { setOpenCard(null); setComparePair(null); }} />
       <Sheet open={whyOpen && !!focusSlot && !!breakdown.slots[focusSlot ?? ""]} onClose={() => setWhyOpen(false)} title="¿Por qué tengo esta química?" testId="chem-why-sheet">
         {focusSlot && breakdown.slots[focusSlot] && draft.lineup[focusSlot] && (
           <div className="space-y-4">
@@ -372,6 +411,18 @@ export function FootballGame() {
         )}
       </Sheet>
       {xiModal}
+      <ActionBar items={isSquad ? [
+        { key: "xi", label: "Mi XI", icon: "⚽", onClick: () => setShowXi(true) },
+        { key: "chem", label: "Química", icon: "⚗", onClick: () => setChemMode((v) => !v), active: chemMode },
+        { key: "tactic", label: "Táctica", icon: "♟", onClick: () => document.getElementById("fb-tactics")?.scrollIntoView({ behavior: settings.reducedMotion ? "auto" : "smooth", block: "start" }) },
+        { key: "live", label: "En vivo", icon: "▶", onClick: () => beginSeason(true), disabled: busy },
+        { key: "sim", label: "Simular", icon: "⏩", onClick: () => beginSeason(false), disabled: busy, primary: true },
+      ] : [
+        { key: "xi", label: "Mi XI", icon: "⚽", onClick: () => setShowXi(true), disabled: !filled },
+        { key: "chem", label: "Química", icon: "⚗", onClick: () => setChemMode((v) => !v), active: chemMode },
+        { key: "compare", label: "Comparar", icon: "⇄", onClick: () => { setCompareMode((v) => !v); setCompareId(null); setListOpen(true); }, active: compareMode, disabled: needSpin || !!captainPick },
+        { key: "list", label: listOpen ? "Ocultar" : "Opciones", icon: listOpen ? "▾" : "▴", onClick: () => setListOpen((v) => !v), disabled: needSpin || !!captainPick },
+      ]} />
     </div>
   );
 }

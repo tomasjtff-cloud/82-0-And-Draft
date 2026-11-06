@@ -1,5 +1,6 @@
 "use client";
 import { Sheet } from "@/components/common/Sheet";
+import { diffName } from "@/lib/core/difficulty";
 import type { NbaTeamSnapshot } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
 import { tierOf } from "./NbaCardView";
@@ -41,7 +42,7 @@ export function QuintetModal({ open, onClose, snap, children }: { open: boolean;
             <div><span className="font-cond font-bold uppercase text-loss">Debilidades: </span><span className="text-muted">{snap.weaknesses.join(", ") || "—"}</span></div>
           </div>
           {snap.record && <p className="text-sm">Temporada: <b>{snap.record.wins}-{snap.record.losses}</b>{snap.playoff ? ` · ${snap.playoff}` : ""}</p>}
-          <p className="text-[11px] text-dim">Dificultad {snap.difficulty} · semilla de temporada <span className="font-mono">{snap.seed}</span></p>
+          <p className="text-[11px] text-dim">Dificultad {diffName(snap.difficulty)} · semilla de temporada <span className="font-mono">{snap.seed}</span></p>
           {children}
         </div>
       )}

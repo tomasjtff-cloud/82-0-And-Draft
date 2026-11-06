@@ -89,3 +89,31 @@ export function scoreline(m: Match): string {
   if (m.pens) s += ` · pen. ${m.pens.h}-${m.pens.a}`;
   return s;
 }
+
+/* ───────── Exact outcome probabilities (no RNG) ───────── */
+const poissonPmf = (l: number): number[] => {
+  const out: number[] = []; let p = Math.exp(-l), acc = 0;
+  for (let k = 0; k < 9; k++) { out.push(p); acc += p; p *= l / (k + 1); }
+  out.push(Math.max(0, 1 - acc)); // goals are capped at 9 by the engine
+  return out;
+};
+/**
+ * Win/draw/loss probabilities of a single 90' match under the SAME model as playMatch:
+ * Poisson goals with λ from expectedGoals and the per-match form terms integrated out
+ * (form difference d = f_a − f_b ~ N(0, FORM_SD·√2), 41-point quadrature). Pure, deterministic, ~0.1 ms.
+ */
+export function outcomeProbs(a: Side, b: Side, venue: "home" | "away" | "neutral"): { win: number; draw: number; loss: number; xgFor: number; xgAgainst: number } {
+  const adv = venue === "home" ? HOME_ADV : venue === "away" ? -HOME_ADV : 0;
+  const sd = FORM_SD * Math.SQRT2;
+  let win = 0, draw = 0, loss = 0, wsum = 0, xf = 0, xa = 0;
+  for (let i = -20; i <= 20; i++) {
+    const z = (i / 20) * 4, w = Math.exp(-0.5 * z * z), d = z * sd;
+    const la = Math.max(0.05, BASE_GOALS * Math.exp(K * (a.att - b.def + d) + adv));
+    const lb = Math.max(0.05, BASE_GOALS * Math.exp(K * (b.att - a.def - d) - adv));
+    const pa = poissonPmf(la), pb = poissonPmf(lb);
+    let W = 0, D = 0;
+    for (let x = 0; x < 10; x++) for (let y = 0; y < 10; y++) { const q = pa[x] * pb[y]; if (x > y) W += q; else if (x === y) D += q; }
+    win += w * W; draw += w * D; loss += w * (1 - W - D); wsum += w; xf += w * la; xa += w * lb;
+  }
+  return { win: win / wsum, draw: draw / wsum, loss: loss / wsum, xgFor: xf / wsum, xgAgainst: xa / wsum };
+}

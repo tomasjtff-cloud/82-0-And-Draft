@@ -38,6 +38,8 @@ export interface EventInput {
   squad: SquadMember[]; seed: string; matchId: string; userSide: "home" | "away";
   goalsReg: number; goalsEt: number; concededReg: number; concededEt: number; extraTime: boolean;
   xgFor: number; xgAgainst: number;
+  /** tactic possession bias in percentage points (0 = Equilibrado; no extra RNG) */
+  possessionBias?: number;
 }
 
 export function generateMatchEvents(i: EventInput): UserMatchDetail {
@@ -100,7 +102,7 @@ export function generateMatchEvents(i: EventInput): UserMatchDetail {
   const shots = G + extraShots, sot = G + binom(rng, extraShots, 0.27);
   const oppExtra = rng.poisson(Math.max(1, i.xgAgainst * 8.5 + 3)) % 30;
   const oppShots = O + oppExtra, oppSot = O + binom(rng, oppExtra, 0.3);
-  const possession = Math.round(Math.max(28, Math.min(72, 50 + 12 * Math.tanh((i.xgFor - i.xgAgainst) / 1.5) + rng.normal(0, 3))));
+  const possession = Math.round(Math.max(28, Math.min(72, 50 + (i.possessionBias ?? 0) + 12 * Math.tanh((i.xgFor - i.xgAgainst) / 1.5) + rng.normal(0, 3))));
   const teamPasses = Math.round(420 * (T / 90) + (possession - 50) * 8 + rng.normal(0, 30));
 
   const lines = new Map<string, FbPlayerLine>();

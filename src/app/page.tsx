@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { T } from "@/lib/i18n";
 
 export default function Home() {
   return (
@@ -19,13 +20,13 @@ export default function Home() {
           className="group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-nba-deep via-surface to-ink p-7 transition-transform hover:-translate-y-1 md:p-9">
           <CourtArt />
           <div className="relative">
-            <span className="chip border-nba/50 text-nba-2">Game 1</span>
+            <span className="chip border-nba/50 text-nba-2">{T.games.game1}</span>
             <h2 className="font-display mt-4 text-5xl md:text-6xl">NBA <span className="text-nba">82-0</span></h2>
-            <p className="mt-2 text-lg font-semibold">Build your legendary starting five.</p>
-            <p className="text-muted">Can you go undefeated?</p>
+            <p className="mt-2 text-lg font-semibold">{T.home.nbaTitle}</p>
+            <p className="text-muted">{T.home.nbaSub}</p>
             <ul className="mt-6 space-y-1 text-sm text-muted">
               <li>· 5 rondas: franquicia + década al azar</li>
-              <li>· 1 re-spin de equipo y 1 de época</li>
+              <li>· 1 nuevo giro de equipo y 1 de época</li>
               <li>· 82 partidos simulados uno a uno</li>
             </ul>
             <span className="btn btn-nba mt-7">Jugar ahora →</span>
@@ -36,10 +37,10 @@ export default function Home() {
           className="group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-pitch via-surface to-ink p-7 transition-transform hover:-translate-y-1 md:p-9">
           <PitchArt />
           <div className="relative">
-            <span className="chip border-gold/50 text-gold-2">Game 2</span>
-            <h2 className="font-display mt-4 text-5xl md:text-6xl">FOOTBALL <span className="text-gold">ULTIMATE DRAFT</span></h2>
-            <p className="mt-2 text-lg font-semibold">Build your dream XI.</p>
-            <p className="text-muted">Conquer England and Europe.</p>
+            <span className="chip border-gold/50 text-gold-2">{T.games.game2}</span>
+            <h2 className="font-display mt-4 text-5xl md:text-6xl">DRAFT DE <span className="text-gold">FÚTBOL</span></h2>
+            <p className="mt-2 text-lg font-semibold">{T.home.fbTitle}</p>
+            <p className="text-muted">{T.home.fbSub}</p>
             <ul className="mt-6 space-y-1 text-sm text-muted">
               <li>· Historical Roulette o FUT Draft</li>
               <li>· Premier League, Champions, FA Cup y Carabao Cup</li>

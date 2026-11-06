@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { diffName } from "@/lib/core/difficulty";
 import { KEYS, load, save, type HistoryEntry } from "@/lib/storage";
 import { QuintetModal } from "@/components/nba/QuintetModal";
 import type { NbaTeamSnapshot } from "@/types/nba";
@@ -43,7 +44,7 @@ export default function HistoryPage() {
             </div>
             <div className="col-span-2 text-right text-xs text-muted sm:col-span-1">
               <div>{new Date(h.date).toLocaleString("es-ES")}</div>
-              <div>{h.difficulty} · <span className="font-mono">{h.seed}</span></div>
+              <div>{diffName(h.difficulty)} · <span className="font-mono">{h.seed}</span></div>
               {h.nba && <button className="btn btn-sm mt-1" onClick={() => setSnap(h.nba!)} data-testid="history-quintet">Ver quinteto</button>}
               {h.game === "football" && (snapshotIsComplete(h.football) ? (
                 <div className="mt-1 flex flex-wrap justify-end gap-1">

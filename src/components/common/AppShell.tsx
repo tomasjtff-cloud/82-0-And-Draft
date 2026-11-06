@@ -1,15 +1,19 @@
 "use client";
 import Link from "next/link";
+import { T } from "@/lib/i18n";
 import { usePathname } from "next/navigation";
 import { MotionConfig } from "motion/react";
 import { useSettings } from "@/hooks/useSettings";
+import { AchievementToasts } from "./AchievementToasts";
 
 const NAV = [
-  { href: "/", label: "Inicio" },
-  { href: "/nba", label: "NBA 82-0" },
-  { href: "/football", label: "Football Draft" },
-  { href: "/history", label: "Historial" },
-  { href: "/settings", label: "Ajustes" },
+  { href: "/", label: T.nav.home },
+  { href: "/nba", label: T.nav.nba },
+  { href: "/football", label: T.nav.football },
+  { href: "/legado", label: T.nav.legacy },
+  { href: "/logros", label: T.nav.achievements },
+  { href: "/history", label: T.nav.history },
+  { href: "/settings", label: T.nav.settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -38,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1">{children}</main>
+        <AchievementToasts />
         <footer className="border-t border-line px-4 py-6 text-center text-xs text-dim">
           Legends Lab · proyecto personal sin fines comerciales · ratings y simulaciones son estimaciones propias, no datos oficiales.
         </footer>

@@ -4,7 +4,7 @@ import { AppShell } from "@/components/common/AppShell";
 
 export const metadata: Metadata = {
   title: "Legends Lab",
-  description: "NBA 82-0 Challenge + Football Ultimate Draft & Season Simulator. Proyecto personal.",
+  description: "NBA 82-0 y Draft de fútbol: drafts históricos y temporadas simuladas. Proyecto personal.",
 };
 export const viewport: Viewport = { themeColor: "#06070a", width: "device-width", initialScale: 1, viewportFit: "cover" };
 

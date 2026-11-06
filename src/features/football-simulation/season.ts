@@ -13,11 +13,14 @@ import { buildCalendar, type SeasonEvent } from "./calendar";
 import { roundRobin, sortPremierLeague, sortUclLeague, standings } from "./league";
 import { drawLeaguePhase, makePots, type LeagueFixture } from "./ucl-draw";
 import { decidedWinner, playMatch, type Decider, type Side } from "./match";
+import { TACTICS, tacticAdjust, tacticFatigue, type TacticChoice } from "./tactics";
 
 export interface UserTeamInput {
   clubId: string; name: string; rating: number; att: number; def: number; replacedClubId?: string;
   /** the drafted XI; when present, individual events are simulated for every user match (cosmetic RNG stream) */
   squad?: SquadMember[];
+  /** fixed tactic for the season (absent = Equilibrado = pre-V4 engine) */
+  tactic?: TacticChoice;
 }
 
 export interface SeasonState {
@@ -46,6 +49,8 @@ export interface SeasonState {
   rng: RngState;
   /** user's XI (absent for Monte Carlo runs and pre-V3 saves) */
   squad?: SquadMember[];
+  /** user's tactic (absent in pre-V4 saves = Equilibrado) */
+  tactic?: TacticChoice;
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
@@ -99,6 +104,7 @@ export function createSeason(seed: string, difficulty: Difficulty, user: UserTea
     plFixtures: roundRobin(plTeams, rng), uclFixtures, events: buildCalendar(), cursor: 0, matches: [], ties: [],
     alive: { FA: [...faTeams], EFL: [] }, uclRanking: null, uclBracket: null, lastPlayed: {}, rng: rng.state(),
     ...(user.squad ? { squad: user.squad } : {}),
+    ...(user.tactic && user.tactic.id !== "balanced" ? { tactic: user.tactic } : {}),
   };
 }
 
@@ -108,16 +114,22 @@ function side(s: SeasonState, id: string, date: string): Side {
   const t = s.teams[id];
   const d = DIFFICULTY_PARAMS[s.difficulty];
   const recent = (s.lastPlayed[id] ?? []).filter((x) => daysBetween(x, date) <= 6).length;
-  const factor = t.isUser ? d.fbFatigue : 0.6;
+  const factor = t.isUser ? d.fbFatigue * tacticFatigue(s.tactic) : 0.6;
   const fatigue = Math.max(0, recent - 1) * 1.5 * factor + (recent >= 1 && (s.lastPlayed[id] ?? []).some((x) => daysBetween(x, date) <= 3) ? 0.8 * factor : 0);
   return { id, att: t.att - fatigue, def: t.def - fatigue };
+}
+/** Applies the user's tactic to its own side (no-op for rivals and for Equilibrado). */
+function tactical(s: SeasonState, sd: Side, oppId: string): Side {
+  if (sd.id !== s.userId || !s.tactic) return sd;
+  const a = tacticAdjust(s.tactic, s.teams[s.userId].rating, s.teams[oppId].rating);
+  return { ...sd, att: sd.att + a.att, def: sd.def + a.def };
 }
 function record(s: SeasonState, m: Match) {
   s.matches.push(m);
   for (const id of [m.home, m.away]) (s.lastPlayed[id] ??= []).push(m.date), (s.lastPlayed[id] = s.lastPlayed[id].slice(-4));
 }
 function play(s: SeasonState, rng: Rng, home: string, away: string, ev: SeasonEvent, decider: Decider, extra: Partial<Match> & { aggregateBefore?: { home: number; away: number } } = {}): Match {
-  const m = playMatch(rng, side(s, home, ev.date), side(s, away, ev.date), {
+  const m = playMatch(rng, tactical(s, side(s, home, ev.date), away), tactical(s, side(s, away, ev.date), home), {
     id: `${ev.id}-${home}-${away}`, comp: ev.comp, stage: ev.stage, date: ev.date, decider,
     neutral: extra.neutral, aggregateBefore: extra.aggregateBefore, tieId: extra.tieId, leg: extra.leg,
   });
@@ -128,6 +140,7 @@ function play(s: SeasonState, rng: Rng, home: string, away: string, ev: SeasonEv
       goalsReg: userHome ? m.hg : m.ag, goalsEt: m.et ? (userHome ? m.et.hg : m.et.ag) : 0,
       concededReg: userHome ? m.ag : m.hg, concededEt: m.et ? (userHome ? m.et.ag : m.et.hg) : 0,
       extraTime: !!m.et, xgFor: userHome ? m.xg!.h : m.xg!.a, xgAgainst: userHome ? m.xg!.a : m.xg!.h,
+      possessionBias: s.tactic ? TACTICS[s.tactic.id].possession : 0,
     });
   }
   record(s, m);
@@ -349,7 +362,7 @@ export function summarize(s: SeasonState): { trophies: TrophyResult[]; plPositio
   if (done) {
     const names = (id: string | null) => (id ? s.teams[id]?.name ?? id : "—");
     narrative.push(`Campeones: PL ${names(pl.champion)}, UCL ${names(ucl.champion)}, FA Cup ${names(fa.champion)}, Carabao ${names(efl.champion)}.`);
-    narrative.push(won === 4 ? "THE QUADRUPLE. Temporada perfecta." : won === 3 ? "Un triplete histórico." : won === 2 ? "Doblete." : won === 1 ? "Un título para la vitrina." : "Temporada sin títulos.");
+    narrative.push(won === 4 ? "¡QUADRUPLE! Temporada perfecta." : won === 3 ? "Un triplete histórico." : won === 2 ? "Doblete." : won === 1 ? "Un título para la vitrina." : "Temporada sin títulos.");
   }
   return { trophies, plPosition: plPos, narrative, quadruple: done && won === 4 };
 }

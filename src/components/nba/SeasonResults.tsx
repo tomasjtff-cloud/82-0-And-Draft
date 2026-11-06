@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { diffName } from "@/lib/core/difficulty";
+import { T } from "@/lib/i18n";
+import { NbaAwards } from "./NbaAwards";
 import { motion } from "motion/react";
 import { FRANCHISE_BY_ID } from "@/lib/data/nba/franchises";
 import type { NbaGameResult, NbaSeasonResult } from "@/types/nba";
@@ -69,7 +72,7 @@ export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCu
           </div>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-nba transition-all" style={{ width: `${(revealed / 82) * 100}%` }} /></div>
-        <div className="mt-2 text-xs text-muted">Semilla <span className="font-mono text-text">{result.seed}</span> · Dificultad {result.difficulty}</div>
+        <div className="mt-2 text-xs text-muted">Semilla <span className="font-mono text-text">{result.seed}</span> · Dificultad {diffName(result.difficulty)}</div>
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -118,7 +121,7 @@ export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCu
           )}
           {tab === "standings" && result.standings && <StandingsView standings={result.standings} userName={teamName} />}
           {tab === "playoffs" && result.playoffs && <PlayoffsView result={result} userName={teamName} />}
-          {tab === "stats" && result.stats && <PlayerStatsView stats={result.stats} />}
+          {tab === "stats" && result.stats && <div className="space-y-5"><NbaAwards result={result} /><PlayerStatsView stats={result.stats} /></div>}
           {tab === "mc" && <MonteCarloPanel mc={mc} busy={mcBusy} onRun={onMonteCarlo} teamName={teamName} />}
         </>
       )}
@@ -139,7 +142,7 @@ function GameDetail({ g, teamName }: { g: NbaGameResult; teamName: string }) {
         <div>Prob. previa de victoria: <b className="text-text">{(g.winProb * 100).toFixed(1)}%</b></div>
         <div>Margen esperado: <b className="text-text">{g.expectedMargin > 0 ? "+" : ""}{g.expectedMargin}</b></div>
         <div>Localía: <b className="text-text">{g.home ? "Casa" : "Fuera"}</b></div>
-        <div>Back-to-back: <b className="text-text">{g.backToBack ? "Sí" : "No"}</b></div>
+        <div>{T.nba.b2b}: <b className="text-text">{g.backToBack ? "Sí" : "No"}</b></div>
       </div>
       {g.box && (
         <table className="mt-3 w-full text-xs" data-testid="box-score">

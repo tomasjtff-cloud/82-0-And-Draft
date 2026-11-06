@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { diffName } from "@/lib/core/difficulty";
+import { T } from "@/lib/i18n";
 import { AnimatePresence, motion } from "motion/react";
 import type { Difficulty } from "@/lib/core/difficulty";
 import { DIFFICULTY_PARAMS } from "@/lib/core/difficulty";
@@ -7,6 +9,8 @@ import { randomSeed } from "@/lib/core/rng";
 import { FRANCHISE_BY_ID, NBA_FRANCHISES } from "@/lib/data/nba/franchises";
 import { evaluateNbaTeam } from "@/lib/ratings/nba";
 import { addHistory, KEYS, load, remove, save, type HistoryEntry } from "@/lib/storage";
+import { recordDraft, recordSeason } from "@/lib/progress/store";
+import { nbaSeasonRecord } from "@/lib/progress/summarize";
 import { animMs, useSettings } from "@/hooks/useSettings";
 import type { NbaCard, NbaDraftState, NbaPos, NbaSeasonResult, NbaTeamSnapshot } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
@@ -73,6 +77,7 @@ export function NbaGame() {
   const lineup = useMemo(() => (draft ? lineupCards(draft) : {}), [draft]);
   const teamEval = useMemo(() => evaluateNbaTeam(lineup, sens), [lineup, sens]);
   const complete = draft ? isComplete(draft) : false;
+  useEffect(() => { if (complete && draft) recordDraft({ game: "nba", id: draft.seed, date: new Date().toISOString(), chem: teamEval.chemistry }); }, [complete, draft, teamEval.chemistry]);
   const snapshot = useMemo(() => (draft && Object.keys(draft.lineup).length ? buildSnapshot(lineup, diff, season?.result.seed ?? "—", draft.seed, { identity, ...(season ? { record: { wins: season.result.wins, losses: season.result.losses }, playoff: season.result.playoffs ? OUTCOME_LABEL[season.result.playoffs.outcome] : undefined } : {}) }) : null), [draft, lineup, diff, season, identity]);
   const spinKey = draft?.spin ? `${draft.round}:${draft.spin.franchiseId}:${draft.spin.decade}` : null;
   const isRevealed = !!spinKey && revealed === spinKey;
@@ -110,6 +115,7 @@ export function NbaGame() {
     const outcome = result.playoffs ? OUTCOME_LABEL[result.playoffs.outcome] : undefined;
     addHistory({ game: "nba", seed, difficulty: draft.difficulty, title: `${result.wins}-${result.losses}${result.playoffs?.outcome === "champion" ? " 🏆" : ""}`, detail: `${teamName} · ${names}${outcome ? ` · ${outcome}` : ""}`, score: result.wins,
       nba: buildSnapshot(lineup, draft.difficulty, seed, draft.seed, { record: { wins: result.wins, losses: result.losses }, playoff: outcome, identity }) });
+    recordSeason(nbaSeasonRecord(result, lineup, teamEval, { draftSeed: draft.seed, teamName }));
     const prev = load<{ wins: number } | null>(KEYS.nbaBest, null);
     if (!prev || result.wins > prev.wins) save(KEYS.nbaBest, { wins: result.wins, losses: result.losses, seed });
   };
@@ -132,7 +138,7 @@ export function NbaGame() {
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
           <section>
-            <span className="chip border-nba/50 text-nba-2">Game 1</span>
+            <span className="chip border-nba/50 text-nba-2">{T.games.game1}</span>
             <h1 className="font-display mt-3 text-6xl leading-none md:text-8xl">NBA <span className="text-nba">82-0</span></h1>
             <p className="mt-3 text-lg">Build your legendary starting five. <span className="text-muted">Can you go undefeated?</span></p>
             <div className="panel mt-8 p-5">
@@ -165,7 +171,7 @@ export function NbaGame() {
                     <li>Cinco rondas. En cada una se sortean una <b className="text-text">franquicia</b> y una <b className="text-text">década</b>.</li>
                     <li>Elige un jugador que realmente jugó en esa franquicia en esa década. Cada carta es una temporada concreta.</li>
                     <li>Colócalo en una posición libre (PG, SG, SF, PF, C). Algunas cartas admiten posición secundaria.</li>
-                    <li>Tienes <b className="text-text">1 Re-spin de equipo</b> y <b className="text-text">1 Re-spin de época</b> para todo el draft.</li>
+                    <li>Tienes <b className="text-text">1 nuevo giro de equipo</b> y <b className="text-text">1 nuevo giro de época</b> para todo el draft.</li>
                     <li>Con el quinteto completo, simula 82 partidos. Cada partido es un sorteo probabilístico reproducible por semilla.</li>
                   </ol>
                 </motion.div>
@@ -186,7 +192,7 @@ export function NbaGame() {
                     <li key={h.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="font-display text-xl tabular">{h.title}</span>
                       <span className="truncate text-xs text-muted">{h.detail}</span>
-                      <span className="chip text-[10px]">{h.difficulty}</span>
+                      <span className="chip text-[10px]">{diffName(h.difficulty)}</span>
                       {h.nba && <button className="btn btn-sm btn-ghost" onClick={() => setHistSnap(h.nba!)} data-testid="history-quintet">Quinteto</button>}
                     </li>
                   ))}
@@ -240,7 +246,7 @@ export function NbaGame() {
       <span className="rounded-lg bg-nba px-2.5 py-1 font-display text-lg leading-none text-black" data-testid="round-indicator">RONDA {Math.min(5, draft.round + 1)}/5</span>
       <div className="flex gap-1" aria-hidden>{[0, 1, 2, 3, 4].map((i) => <span key={i} className={`h-1.5 w-5 rounded-full ${i < draft.round ? "bg-nba" : i === draft.round && !complete ? "bg-nba/50" : "bg-white/10"}`} />)}</div>
       <span className="ml-auto min-w-0 truncate font-cond text-sm font-bold uppercase text-nba-2" data-testid="draft-team-name">{teamName}</span>
-      <span className="chip text-[10px] text-muted">{draft.difficulty}</span>
+      <span className="chip text-[10px] text-muted">{diffName(draft.difficulty)}</span>
       <QuintetButton onClick={() => setShowQuintet(true)} disabled={!Object.keys(draft.lineup).length} />
     </div>
   );
