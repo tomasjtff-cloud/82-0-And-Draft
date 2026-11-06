@@ -48,6 +48,13 @@ describe("NBA ratings v2", () => {
     expect(byName("Luc Longley", 1995).ratings.overall).toBeLessThanOrEqual(72);
     expect(byName("Kendrick Perkins", 2009).ratings.overall).toBeLessThanOrEqual(76);
   });
+  it("user reference anchors (v2.1): prime Jordan/LeBron = 99, LaMelo 2022-23 = 82-83", () => {
+    for (const y of [1987, 1988, 1990]) expect(byName("Michael Jordan", y).ratings.overall).toBe(99);
+    for (const y of [2008, 2012]) expect(byName("LeBron James", y).ratings.overall).toBe(99);
+    const lamelo = byName("LaMelo Ball", 2022).ratings.overall;
+    expect(lamelo).toBeGreaterThanOrEqual(82); expect(lamelo).toBeLessThanOrEqual(83);
+    expect(ALL_CARDS.filter((c) => c.ratings.overall === 99).length).toBeLessThanOrEqual(12);
+  });
   it("prime seasons beat lesser seasons of the same legend", () => {
     expect(byName("Kobe Bryant", 2005).ratings.overall).toBeGreaterThan(byName("Kobe Bryant", 1998).ratings.overall + 8);
     expect(byName("Michael Jordan", 1988).ratings.overall).toBeGreaterThan(byName("Michael Jordan", 2001).ratings.overall + 8);

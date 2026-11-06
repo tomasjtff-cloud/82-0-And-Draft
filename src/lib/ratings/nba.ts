@@ -62,12 +62,14 @@ function shootingScore(p: NbaPlayerSeason, n: Normalized): number {
  *    the season's real RAPTOR when it exists (weight 0.5·min(1, MP/2500)).
  * 2. Impact (pts/100 above average) → OVR via documented knots.
  * 3. Production index (volume/box line) → OVR, so big statistical seasons read
- *    as a video game would. Final OVR = 0.62·impact + 0.38·production.
+ *    as a video game would. Final OVR = 0.57·impact + 0.43·production (v2.1).
  */
 const BETA = Object.values(calibration.coefficients) as number[];
 const R2 = calibration.r2 || 0.6;
 const IMPACT_MEAN = 3.0;
-const KNOTS: [number, number][] = [[-3, 64], [0, 75], [2, 81], [4, 86], [6, 91], [8, 94.5], [10, 96.8], [12, 98.5], [14, 99]];
+/** v2.1 anchors (user reference): prime Jordan/LeBron → 99, LaMelo 2022-23 → 82-83; tiers per README. */
+const KNOTS: [number, number][] = [[-3, 64], [0, 76], [2, 83], [4, 88], [6, 92.5], [8, 96], [9.5, 99.5], [14, 100]];
+const W_IMPACT = 0.57, PROD_OFFSET = 52, PROD_SLOPE = 0.85, PROD_EFF_WEIGHT = 12;
 export function impactToOvr(I: number): number {
   if (I <= KNOTS[0][0]) return KNOTS[0][1] + (I - KNOTS[0][0]) * 2.5;
   for (let i = 1; i < KNOTS.length; i++) {
@@ -93,9 +95,10 @@ export function rateNbaPlayer(p: NbaPlayerSeason): NbaRatings {
   const ptsTerm = n.pts <= 30 ? 0.9 * n.pts : 27 + 0.5 * (n.pts - 30);
   const effTerm = f.relEfg * 60 * f.vol;
   const shoot = shootingScore(p, n);
-  const prodIndex = ptsTerm + 0.55 * n.reb + 1.4 * n.ast + 2.0 * n.stl + 1.4 * n.blk + effTerm + p.defRep * 2.0;
+  // production index: volume line, efficiency counts but less than in the impact model (video-game view of big statistical seasons)
+  const prodIndex = ptsTerm + 0.55 * n.reb + 1.4 * n.ast + 2.0 * n.stl + 1.4 * n.blk + f.relEfg * PROD_EFF_WEIGHT * f.vol + p.defRep * 2.0;
   const { impact } = impactEstimate(p);
-  const overall = clamp(Math.round(0.62 * impactToOvr(impact) + 0.38 * Math.min(99, 47 + 0.85 * prodIndex)), 55, 99);
+  const overall = clamp(Math.round(W_IMPACT * impactToOvr(impact) + (1 - W_IMPACT) * Math.min(99, PROD_OFFSET + PROD_SLOPE * prodIndex)), 55, 99);
 
   const offense = 30 + ptsTerm * 1.55 + n.ast * 1.6 + effTerm * 1.2 + Math.max(0, shoot - 55) * 0.15;
   const defense = 30 + n.stl * 9 + n.blk * 7 + n.reb * 1.1 + p.defRep * 9;
@@ -124,8 +127,8 @@ export function toCard(p: NbaPlayerSeason): NbaCard {
 
 /* ───────────── Team evaluation ───────────── */
 
-/** Team model calibration (v2): avg OVR 79 ≈ league-average team (net 0). See tests/unit/nba-calibration.test.ts. */
-export const TEAM_OVR_PIVOT = 79;
+/** Team model calibration (v2): avg OVR 80.5 ≈ league-average team (net 0). See tests/unit/nba-calibration.test.ts. */
+export const TEAM_OVR_PIVOT = 80.5;
 export const TEAM_OVR_SLOPE = 1.0;
 
 export interface NbaTeamEval {

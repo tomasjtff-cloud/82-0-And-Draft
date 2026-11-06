@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — 2026-11-06
+### Cambiado
+- Escala NBA v2.1 con las anclas de referencia del usuario: primes de Jordan y LeBron = 99, LaMelo 2022-23 = 82. Nodos de impacto más altos, menos castigo por eficiencia en el índice de producción (0,57 impacto / 0,43 producción). Pivote del modelo de equipo 79 → 80,5 para que los récords no se inflen (leyendas ≈ 73-74 victorias en Normal).
+
 ## 0.3.0 — 2026-11-06 (Legends Lab V2)
 ### Corregido
 - NBA: jugadores repetidos en una misma lista (p. ej. Zion Williamson) — el pool listaba cada temporada como carta distinta. Ahora una carta por jugador (mejor temporada) y las demás temporadas en su ficha.

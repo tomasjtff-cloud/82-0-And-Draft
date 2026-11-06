@@ -78,8 +78,8 @@ tests/unit/*.test.ts · tests/e2e/smoke.mjs
 GitHub Pages (`.github/workflows/pages.yml`) queda solo como espejo manual (`workflow_dispatch`): `GITHUB_PAGES=true` activa `output: export` + basePath.
 
 ## NBA v2 (resumen técnico)
-- **Ratings**: `src/lib/ratings/nba-features.ts` (features con eFG estimado) + `scripts/calibrate-nba.ts` (regresión ridge ponderada por minutos contra RAPTOR → `nba-calibration.json`). OVR = 0.62·impactToOvr(impacto) + 0.38·producción. Impacto = predicción ajustada en varianza (÷√R²) mezclada con RAPTOR real (peso 0.5·min(1, MP/2500)).
-- **Equipo**: net = (OVR medio − 79)·1.0 + (ataque−80)·0.06 + (defensa−65)·0.06 + Σ ajustes de encaje. Química = 70 + 8·Σ ajustes (`evaluateNbaTeam().fit`).
+- **Ratings**: `src/lib/ratings/nba-features.ts` (features con eFG estimado) + `scripts/calibrate-nba.ts` (regresión ridge ponderada por minutos contra RAPTOR → `nba-calibration.json`). OVR = 0.57·impactToOvr(impacto) + 0.43·producción (v2.1; anclas del usuario: primes de Jordan/LeBron = 99, LaMelo 22-23 = 82–83, testeadas). Impacto = predicción ajustada en varianza (÷√R²) mezclada con RAPTOR real (peso 0.5·min(1, MP/2500)).
+- **Equipo**: net = (OVR medio − 80.5)·1.0 + (ataque−80)·0.06 + (defensa−65)·0.06 + Σ ajustes de encaje. Química = 70 + 8·Σ ajustes (`evaluateNbaTeam().fit`).
 - **Pools del draft**: un jugador por franquicia+década (mejor temporada: OVR → impacto → PJ → más reciente); otras temporadas seleccionables (`versionsFor`).
 - **Liga**: 31 equipos (30 franquicias + "YOU" en el Oeste), 82 partidos exactos cada uno (`league.ts`). Playoffs top-8 por conferencia, mejor de 7 (2-2-1-1-1). RNG separados: `nba-season:`, `nba-league:`, `nba-playoffs:`.
 - **Box scores**: `boxscore.ts` reparte exactamente el marcador entre 5 titulares + banquillo (invariantes testeadas).

@@ -90,11 +90,11 @@ Parámetros explícitos (`lib/core/difficulty.ts`): boost de rivales, σ de marg
 2. **Modelo de impacto**: regresión lineal ridge (λ=2, ponderada por minutos) del RAPTOR total real de FiveThirtyEight sobre esas features en 537 temporadas verificadas → R² 0,60, RMSE 1,77 (`scripts/calibrate-nba.ts` → `nba-calibration.json`).
 3. **Corrección de varianza**: la regresión encoge los extremos; la predicción se re-escala por 1/√R² alrededor de la media para que las leyendas fuera del rango de 538 (pre-1977, 2022+) no queden comprimidas.
 4. **Mezcla con dato real**: si la temporada tiene RAPTOR (≥500 min), impacto = w·RAPTOR + (1−w)·predicción con w = 0,5·min(1, MP/2500).
-5. **Escala**: impacto → OVR por nodos lineales (−3→64, 0→75, 2→81, 4→86, 6→91, 8→94,5, 10→96,8, 12→98,5, 14→99). OVR final = 0,62·impacto + 0,38·índice de producción (volumen estadístico), recortado a 55–99.
-6. Causa de los casos reportados: el modelo anterior usaba FG% crudo (castiga a tiradores de 3 como LaMelo) y un ajuste de rebotes por época que penalizaba a pívots de los 90 (Ewing). Ahora: Ewing 89-90 = 90, 93-94 = 87; LaMelo 22-23 = 77 (su impacto real esa temporada fue modesto: 41 % en tiros de campo en 36 partidos).
+5. **Escala (v2.1)**: impacto → OVR por nodos lineales (−3→64, 0→76, 2→83, 4→88, 6→92,5, 8→96, 9,5→99,5). Índice de producción = línea de volumen + eficiencia con peso reducido (12), mapeado como 52 + 0,85·índice. OVR final = 0,57·impacto + 0,43·producción, recortado a 55–99. Anclas de referencia del usuario (testeadas): primes de Jordan 87-88/88-89/90-91 y LeBron 08-09/12-13 = 99; LaMelo 22-23 = 82. También llegan a 99 Wilt (61-62, 63-64, 66-67), D. Robinson 93-94 y Wade 08-09.
+6. Causa de los casos reportados (v2.0): el modelo anterior usaba FG% crudo (castiga a tiradores de 3 como LaMelo) y un ajuste de rebotes por época que penalizaba a pívots de los 90 (Ewing). Ahora: Ewing 89-90 = 90, 93-94 = 87; LaMelo 22-23 = 77 (su impacto real esa temporada fue modesto: 41 % en tiros de campo en 36 partidos).
 
 ### Modelo de equipo
-net = (OVR medio − 79) + 0,06·(ataque−80) + 0,06·(defensa−65) + Σ ajustes de encaje (× sensibilidad de dificultad). Calibrado para que subir todos los OVR no infle los récords (tests en `tests/unit/nba-v2.test.ts`).
+net = (OVR medio − 80,5) + 0,06·(ataque−80) + 0,06·(defensa−65) + Σ ajustes de encaje (× sensibilidad de dificultad). Calibrado para que subir todos los OVR no infle los récords (tests en `tests/unit/nba-v2.test.ts`).
 
 ### Química NBA (explicable)
 `evaluateNbaTeam().fit` devuelve términos con estado `bonus | ok | pending | penalty` y su valor en puntos de net:
