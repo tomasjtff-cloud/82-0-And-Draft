@@ -5,7 +5,7 @@ import { QuintetModal } from "@/components/nba/QuintetModal";
 import type { NbaTeamSnapshot } from "@/types/nba";
 import { useRouter } from "next/navigation";
 import { XiModal, xiFromSnapshot, type XiSource } from "@/components/football/XiModal";
-import { rebuildFromSnapshot, snapshotIsComplete, type FbSquadSnapshot } from "@/features/football-draft/squad";
+import { rebuildFromSnapshot, snapshotIsComplete, snapshotRules, type FbSquadSnapshot } from "@/features/football-draft/squad";
 
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryEntry[]>([]);
@@ -17,7 +17,7 @@ export default function HistoryPage() {
   const reopen = (fs: FbSquadSnapshot) => {
     const r = rebuildFromSnapshot(fs);
     if (!r) { setMsg("No se puede reconstruir esta temporada: faltan datos del XI."); return; }
-    save(KEYS.fbSession, { phase: "season", config: { difficulty: fs.difficulty, clubId: fs.clubId, replacedClubId: fs.replacedClubId ?? "HUL", formationId: fs.formationId, mode: fs.mode }, draft: r.draft, season: r.season, live: false });
+    save(KEYS.fbSession, { phase: "season", config: { difficulty: fs.difficulty, clubId: fs.clubId, replacedClubId: fs.replacedClubId ?? "HUL", formationId: fs.formationId, mode: fs.mode }, draft: r.draft, season: r.season, live: false, rules: snapshotRules(fs) });
     router.push("/football");
   };
   useEffect(() => setItems(load<HistoryEntry[]>(KEYS.history, [])), []);

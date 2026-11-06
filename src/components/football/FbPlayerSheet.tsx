@@ -2,17 +2,17 @@
 import { useMemo } from "react";
 import { Sheet } from "@/components/common/Sheet";
 import type { FbPlayerSeason, Formation } from "@/types/football";
-import { previewFbPick } from "@/lib/ratings/football";
+import { KIND_ES, previewFbPick } from "@/lib/ratings/football";
 import { leagueOf } from "@/lib/data/football/clubs";
 import { FbCardView, GK_LABELS, OUT_LABELS } from "./FbCardView";
 
 /** Candidate detail + REAL chemistry preview (same engine) + optional side-by-side comparison. */
-export function FbPlayerSheet({ card, compareWith, formation, lineup, slotId, captainId, fitSensitivity, chemWeight = 1, pickLabel = "Elegir", onPick, onClose }: {
+export function FbPlayerSheet({ card, compareWith, formation, lineup, slotId, captainId, fitSensitivity, chemWeight = 1, extended = false, pickLabel = "Elegir", onPick, onClose }: {
   card: FbPlayerSeason | null; compareWith?: FbPlayerSeason | null; formation: Formation; lineup: Record<string, FbPlayerSeason | undefined>;
-  slotId: string | null; captainId: string | null; fitSensitivity: number; chemWeight?: number; pickLabel?: string; onPick: (c: FbPlayerSeason) => void; onClose: () => void;
+  slotId: string | null; captainId: string | null; fitSensitivity: number; chemWeight?: number; extended?: boolean; pickLabel?: string; onPick: (c: FbPlayerSeason) => void; onClose: () => void;
 }) {
-  const p = useMemo(() => (card && slotId ? previewFbPick(formation, lineup, slotId, card, leagueOf, captainId, fitSensitivity, chemWeight) : null), [card, slotId, formation, lineup, captainId, fitSensitivity, chemWeight]);
-  const q = useMemo(() => (compareWith && slotId ? previewFbPick(formation, lineup, slotId, compareWith, leagueOf, captainId, fitSensitivity, chemWeight) : null), [compareWith, slotId, formation, lineup, captainId, fitSensitivity, chemWeight]);
+  const p = useMemo(() => (card && slotId ? previewFbPick(formation, lineup, slotId, card, leagueOf, captainId, fitSensitivity, chemWeight, extended) : null), [card, slotId, formation, lineup, captainId, fitSensitivity, chemWeight, extended]);
+  const q = useMemo(() => (compareWith && slotId ? previewFbPick(formation, lineup, slotId, compareWith, leagueOf, captainId, fitSensitivity, chemWeight, extended) : null), [compareWith, slotId, formation, lineup, captainId, fitSensitivity, chemWeight, extended]);
   const nameOf = (id: string) => lineup[id]?.name ?? card?.name ?? id;
   return (
     <Sheet open={!!card} onClose={onClose} title={card?.name ?? ""} testId="fb-player-sheet">
@@ -28,7 +28,7 @@ export function FbPlayerSheet({ card, compareWith, formation, lineup, slotId, ca
               <ul className="mt-1 space-y-0.5 text-sm">{p.reasons.map((r) => <li key={r} className={r.startsWith("Fuera") ? "text-loss" : "text-muted"}>• {r}</li>)}</ul>
               {p.changes.length > 0 && <ul className="mt-2 flex flex-wrap gap-1.5">{p.changes.map((c) => <li key={c.slotId} className={`chip ${c.to > c.from ? "text-win" : "text-loss"}`}>{c.name} {c.from}→{c.to}</li>)}</ul>}
               {Object.values(lineup).filter(Boolean).length > 0 && <p className="mt-2 text-[11px] text-muted">Ataque del equipo {p.attBefore.toFixed(1)} → {p.attAfter.toFixed(1)} · Defensa {p.defBefore.toFixed(1)} → {p.defAfter.toFixed(1)} (motor de partido; con XI incompleto es una media de los elegidos)</p>}
-              {p.newLinks.length > 0 && <p className="mt-1 text-[11px] text-muted">Nuevos vínculos: {p.newLinks.map((l) => `${nameOf(l.a === slotId ? l.b : l.a)} (${l.kinds.map((k) => (k === "club" ? "club" : k === "nation" ? "nación" : "liga")).join("+")})`).join(", ")}</p>}
+              {p.newLinks.length > 0 && <p className="mt-1 text-[11px] text-muted">Nuevos vínculos: {p.newLinks.map((l) => `${nameOf(l.a === slotId ? l.b : l.a)} (${l.kinds.map((k) => KIND_ES[k]).join("+")})`).join(", ")}</p>}
             </div>
           )}
           {compareWith && q && p ? (

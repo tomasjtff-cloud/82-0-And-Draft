@@ -5,6 +5,7 @@
  * - Positional compatibility, chemistry and line ratings feed the season engine.
  */
 import type { FbAttrs, FbPlayerSeason, FbPos, FbStyle, Formation, GkAttrs } from "@/types/football";
+import { CONTINENT_OF, LANGUAGES_OF } from "@/lib/data/football/nation-links";
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
@@ -68,8 +69,41 @@ export const DRAFT_FIT_MIN = 0.9;
 /* ───────── Chemistry (Legends Lab system, 0..33) ───────── */
 export interface ChemResult { total: number; perSlot: Record<string, number>; links: Record<string, string[]> }
 
+/**
+ * Chemistry rules. FUT (and every pre-0.4.2 save) = classic club/nation/league with full weight.
+ * Historical Roulette v2 = classic + one extra +1 per player if they share idioma (≥3 in the XI),
+ * familia de estilo (≥4) or continente (≥4) — max +1 extra; weight 0.7. Per-player cap stays 3 (team max 33).
+ * Calibrated on 300 random roulette XIs: classic avg 16/33 → extended avg ≈24 (p10 20, p90 28).
+ */
+export interface ChemRules { extended: boolean; weight: number; version: 1 | 2 }
+export const CLASSIC_CHEM: ChemRules = { extended: false, weight: 1, version: 1 };
+export const CHEM_WEIGHT: Record<"roulette" | "fut", number> = { roulette: 0.7, fut: 1 };
+export function chemRulesFor(mode: "roulette" | "fut" | undefined | null, version: 1 | 2 = 2, legacyWeight?: number): ChemRules {
+  if (mode !== "roulette") return { extended: false, weight: 1, version };
+  if (version === 2) return { extended: true, weight: CHEM_WEIGHT.roulette, version: 2 };
+  return { extended: false, weight: legacyWeight ?? 1, version: 1 };
+}
+export const chemWeightFor = (mode: "roulette" | "fut" | undefined | null) => chemRulesFor(mode).weight;
+
+/** Players needed in the XI sharing a language / style family / continent for the Roulette extra +1. */
+export const EXT_MIN = { language: 3, style: 4, continent: 4 } as const;
+
+/** Play-style families (from the estimated archetype of each card). */
+export type StyleFamily = "Toque" | "Vértigo" | "Fuerza";
+const FAMILY: Record<FbStyle, StyleFamily> = {
+  PM: "Toque", TQ: "Toque", DLP: "Toque", REG: "Toque", F9: "Toque", SS: "Toque", BPD: "Toque", LIB: "Toque", SWK: "Toque",
+  SPD: "Vértigo", IF: "Vértigo", DRB: "Vértigo", CRS: "Vértigo", AFB: "Vértigo", CF: "Vértigo",
+  TM: "Fuerza", POA: "Fuerza", BTB: "Fuerza", DES: "Fuerza", STO: "Fuerza", DFB: "Fuerza", SST: "Fuerza",
+};
+export const styleFamily = (s: FbStyle): StyleFamily => FAMILY[s];
+export const STYLE_FAMILY_DESC: Record<StyleFamily, string> = {
+  Toque: "posesión y pase", Vértigo: "velocidad y desborde", Fuerza: "físico e intensidad",
+};
+const continentOf = (n: string) => CONTINENT_OF[n] ?? n;
+const languagesOf = (n: string) => LANGUAGES_OF[n] ?? [n];
+
 export function computeChemistry(
-  formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string, captainId: string | null,
+  formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string, captainId: string | null, extended = false,
 ): ChemResult {
   const placed = formation.slots.map((s) => ({ slot: s, c: lineup[s.id] })).filter((x) => !!x.c) as { slot: Formation["slots"][number]; c: FbPlayerSeason }[];
   const count = (key: (c: FbPlayerSeason) => string) => {
@@ -78,6 +112,9 @@ export function computeChemistry(
     return m;
   };
   const clubs = count((c) => c.clubId), nations = count((c) => c.nation), leagues = count((c) => leagueOf(c.clubId));
+  const continents = count((c) => continentOf(c.nation)), families = count((c) => FAMILY[c.style]);
+  const langs = new Map<string, number>();
+  for (const { c } of placed) for (const l of languagesOf(c.nation)) langs.set(l, (langs.get(l) ?? 0) + 1);
   const lvl = (n: number, t: [number, number, number]) => (n >= t[2] ? 3 : n >= t[1] ? 2 : n >= t[0] ? 1 : 0);
   const perSlot: Record<string, number> = {};
   const links: Record<string, string[]> = {};
@@ -92,6 +129,15 @@ export function computeChemistry(
       const le = lvl(leagues.get(leagueOf(c.clubId))!, [3, 5, 8]);
       if (cl) why.push(`club +${cl}`); if (na) why.push(`nación +${na}`); if (le) why.push(`liga +${le}`);
       pts = cl + na + le;
+      if (extended) {
+        // Extra links (Roulette only): any of them gives +1, never more than +1 per player.
+        const bestLang = languagesOf(c.nation).reduce((b, l) => ((langs.get(l) ?? 0) > b.n ? { l, n: langs.get(l)! } : b), { l: "", n: 0 });
+        const extra: string[] = [];
+        if (bestLang.n >= EXT_MIN.language) extra.push(`idioma ${bestLang.l}`);
+        if (families.get(FAMILY[c.style])! >= EXT_MIN.style) extra.push(`estilo ${FAMILY[c.style]}`);
+        if (continents.get(continentOf(c.nation))! >= EXT_MIN.continent) extra.push(`continente ${continentOf(c.nation)}`);
+        if (extra.length) { pts += 1; why.push(`extra +1 (${extra.join(", ")})`); }
+      }
       // Legends are never isolated: elite players keep a base of 1 (cross-era friendly).
       if (c.ovr >= 90 && pts < 1) { pts = 1; why.push("leyenda +1"); }
       if (captainId && c.id === captainId) { pts += 1; why.push("capitán +1"); }
@@ -117,13 +163,6 @@ export interface FbTeamRatings {
 const ATT_POS: FbPos[] = ["ST", "CF", "LW", "RW"];
 const MID_POS: FbPos[] = ["CAM", "CM", "CDM", "LM", "RM"];
 const DEF_POS: FbPos[] = ["CB", "LB", "RB", "LWB", "RWB"];
-
-/**
- * How much chemistry moves ATT/DEF in each draft mode. Historical Roulette forces club + decade per slot,
- * so links are mostly luck: chemistry weighs 40 % there. FUT Draft keeps the full effect.
- */
-export const CHEM_WEIGHT: Record<"roulette" | "fut", number> = { roulette: 0.4, fut: 1 };
-export const chemWeightFor = (mode: "roulette" | "fut" | undefined | null) => CHEM_WEIGHT[mode ?? "fut"] ?? 1;
 
 export function teamRatings(
   formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, chem: number, fitSensitivity = 1, chemWeight = 1,
@@ -189,10 +228,12 @@ export const STYLE_LABEL: Record<FbStyle, string> = {
 };
 
 /* ───────── Chemistry links & pick preview (same engine, explanatory layer) ───────── */
-export interface ChemLink { a: string; b: string; kinds: ("club" | "nation" | "league")[] }
+export type ChemLinkKind = "club" | "nation" | "league" | "language" | "style";
+export interface ChemLink { a: string; b: string; kinds: ChemLinkKind[] }
 
 /** Pairs of in-position players who share club, nation or league (the groups that feed computeChemistry). */
-export function chemistryLinks(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string): ChemLink[] {
+/** Continent is shared by most of any XI, so it counts but is not drawn as a line. */
+export function chemistryLinks(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string, extended = false): ChemLink[] {
   const placed = formation.slots.map((s) => ({ s, c: lineup[s.id] })).filter((x) => x.c && slotFit(x.c, x.s.pos) >= 0.9) as { s: Formation["slots"][number]; c: FbPlayerSeason }[];
   const out: ChemLink[] = [];
   for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
@@ -201,6 +242,8 @@ export function chemistryLinks(formation: Formation, lineup: Record<string, FbPl
     if (a.c.clubId === b.c.clubId) kinds.push("club");
     if (a.c.nation === b.c.nation) kinds.push("nation");
     if (leagueOf(a.c.clubId) === leagueOf(b.c.clubId)) kinds.push("league");
+    if (extended && a.c.nation !== b.c.nation && languagesOf(a.c.nation).some((l) => languagesOf(b.c.nation).includes(l))) kinds.push("language");
+    if (extended && FAMILY[a.c.style] === FAMILY[b.c.style]) kinds.push("style");
     if (kinds.length) out.push({ a: a.s.id, b: b.s.id, kinds });
   }
   return out;
@@ -212,16 +255,16 @@ export interface FbPickPreview {
   newLinks: ChemLink[]; ownChem: number; outOfPosition: boolean; reasons: string[];
   attBefore: number; attAfter: number; defBefore: number; defAfter: number;
 }
-const KIND_ES = { club: "club", nation: "nacionalidad", league: "liga" } as const;
+export const KIND_ES: Record<ChemLinkKind, string> = { club: "club", nation: "nacionalidad", league: "liga", language: "idioma", style: "estilo de juego" };
 
-export function previewFbPick(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, slotId: string, card: FbPlayerSeason, leagueOf: (clubId: string) => string, captainId: string | null, fitSensitivity = 1, chemWeight = 1): FbPickPreview {
-  const before = computeChemistry(formation, lineup, leagueOf, captainId);
+export function previewFbPick(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, slotId: string, card: FbPlayerSeason, leagueOf: (clubId: string) => string, captainId: string | null, fitSensitivity = 1, chemWeight = 1, extended = false): FbPickPreview {
+  const before = computeChemistry(formation, lineup, leagueOf, captainId, extended);
   const nextLineup = { ...lineup, [slotId]: card };
-  const after = computeChemistry(formation, nextLineup, leagueOf, captainId);
+  const after = computeChemistry(formation, nextLineup, leagueOf, captainId, extended);
   const changes = formation.slots.filter((s) => s.id !== slotId && lineup[s.id] && (before.perSlot[s.id] ?? 0) !== (after.perSlot[s.id] ?? 0))
     .map((s) => ({ slotId: s.id, name: lineup[s.id]!.name, from: before.perSlot[s.id] ?? 0, to: after.perSlot[s.id] ?? 0 }));
-  const linksBefore = new Set(chemistryLinks(formation, lineup, leagueOf).map((l) => `${l.a}|${l.b}|${l.kinds.join()}`));
-  const newLinks = chemistryLinks(formation, nextLineup, leagueOf).filter((l) => (l.a === slotId || l.b === slotId) && !linksBefore.has(`${l.a}|${l.b}|${l.kinds.join()}`));
+  const linksBefore = new Set(chemistryLinks(formation, lineup, leagueOf, extended).map((l) => `${l.a}|${l.b}|${l.kinds.join()}`));
+  const newLinks = chemistryLinks(formation, nextLineup, leagueOf, extended).filter((l) => (l.a === slotId || l.b === slotId) && !linksBefore.has(`${l.a}|${l.b}|${l.kinds.join()}`));
   const slot = formation.slots.find((s) => s.id === slotId)!;
   const outOfPosition = slotFit(card, slot.pos) < 0.9;
   const shared = new Map<string, Set<string>>();
@@ -229,7 +272,7 @@ export function previewFbPick(formation: Formation, lineup: Record<string, FbPla
   const reasons: string[] = [];
   if (outOfPosition) reasons.push(`Fuera de posición en ${slot.pos}: su química individual será 0.`);
   for (const [k, names] of shared) reasons.push(`Comparte ${KIND_ES[k as keyof typeof KIND_ES]} con ${[...names].slice(0, 4).join(", ")}${names.size > 4 ? "…" : ""}.`);
-  if (!reasons.length) reasons.push("No comparte club, nacionalidad ni liga con nadie del XI todavía.");
+  if (!reasons.length) reasons.push(extended ? "No comparte club, nación, liga, idioma ni estilo con nadie del XI todavía." : "No comparte club, nacionalidad ni liga con nadie del XI todavía.");
   const rb = teamRatings(formation, lineup, before.total, fitSensitivity, chemWeight), ra = teamRatings(formation, nextLineup, after.total, fitSensitivity, chemWeight);
   return { before: before.total, after: after.total, delta: after.total - before.total, changes, newLinks, ownChem: after.perSlot[slotId] ?? 0, outOfPosition, reasons, attBefore: rb.att, attAfter: ra.att, defBefore: rb.def, defAfter: ra.def };
 }

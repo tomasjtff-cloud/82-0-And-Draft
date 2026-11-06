@@ -7,7 +7,7 @@ import { randomSeed } from "@/lib/core/rng";
 import { FORMATIONS, FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUBS, HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { FANTASY_ID, PL_CLUBS } from "@/lib/data/football/world";
-import { chemWeightFor, chemistryEffect, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
+import { chemRulesFor, chemistryEffect, type ChemRules, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
 import { addHistory, KEYS, load, remove, save } from "@/lib/storage";
 import { animMs, useSettings } from "@/hooks/useSettings";
 import type { DraftMode, FbDraftState, FbPlayerSeason } from "@/types/football";
@@ -29,7 +29,7 @@ import { FootballMonteCarloPanel } from "@/components/football/MonteCarloPanel";
 
 type Phase = "setup" | "draft" | "squad" | "season";
 interface Config { difficulty: Difficulty; clubId: string; replacedClubId: string; formationId: string; mode: DraftMode }
-interface Session { phase: Phase; config: Config; draft: FbDraftState | null; season: SeasonState | null; live: boolean }
+interface Session { phase: Phase; config: Config; draft: FbDraftState | null; season: SeasonState | null; live: boolean; /** rules the current season was played with */ rules?: ChemRules }
 
 const DEFAULT_CONFIG: Config = { difficulty: "NORMAL", clubId: "ARS", replacedClubId: "HUL", formationId: "4-3-3", mode: "roulette" };
 const CLUB_NAMES = HIST_CLUBS.map((c) => c.name);
@@ -68,8 +68,11 @@ export function FootballGame() {
     if (draft) for (const [k, v] of Object.entries(draft.lineup)) out[k] = FB_CARD_BY_ID[v];
     return out;
   }, [draft]);
-  const chem = useMemo(() => computeChemistry(formation, lineupCards, leagueOf, draft?.captainId ?? null), [formation, lineupCards, draft]);
-  const chemW = chemWeightFor(draft?.mode ?? config.mode);
+  const extended = session.phase === "season" && session.season ? !!session.rules?.extended : chemRulesFor(draft?.mode ?? config.mode).extended;
+  const chem = useMemo(() => computeChemistry(formation, lineupCards, leagueOf, draft?.captainId ?? null, extended), [formation, lineupCards, draft, extended]);
+  // During a season keep the rules it was played with; old sessions without them = classic.
+  const rules: ChemRules = session.phase === "season" && session.season ? (session.rules ?? { extended: false, weight: 1, version: 1 }) : chemRulesFor(draft?.mode ?? config.mode);
+  const chemW = rules.weight;
   const ratings = useMemo(() => teamRatings(formation, lineupCards, chem.total, DIFFICULTY_PARAMS[config.difficulty].fbFitSensitivity, chemW), [formation, lineupCards, chem, config.difficulty, chemW]);
   const userName = config.clubId === FANTASY_ID ? "Fantasy FC" : PL_CLUBS.find((c) => c.id === config.clubId)?.name ?? "Mi club";
 
@@ -91,9 +94,9 @@ export function FootballGame() {
     if (!draft) return;
     setBusy(true);
     setTimeout(() => {
-      let s = createSeason(randomSeed(), config.difficulty, userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, true, chemW));
+      let s = createSeason(randomSeed(), config.difficulty, userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, true, rules));
       if (!live) s = simulateRest(s);
-      set({ season: s, phase: "season", live });
+      set({ season: s, phase: "season", live, rules });
       if (!live) record(s);
       setBusy(false);
     }, 20);
@@ -103,7 +106,7 @@ export function FootballGame() {
     const won = sum.trophies.filter((t) => t.status === "won").map((t) => t.comp);
     const row = plTable(s).find((r) => r.team === s.userId)!;
     addHistory({ game: "football", seed: s.seed, difficulty: s.difficulty, title: sum.quadruple ? "QUADRUPLE" : won.length ? won.join(" + ") : `${sum.plPosition}º PL`, detail: `${userName} · ${draft?.formationId} · OVR ${ratings.ovr}`, score: won.length,
-      ...(draft ? { football: buildFbSnapshot(draft, s.seed, config.clubId, userName, config.replacedClubId, { plPos: row.pos!, pts: row.pts, trophies: won }) } : {}) });
+      ...(draft ? { football: buildFbSnapshot(draft, s.seed, config.clubId, userName, config.replacedClubId, { plPos: row.pos!, pts: row.pts, trophies: won }, session.rules ?? rules) } : {}) });
   };
   const advance = (fn: (s: SeasonState) => SeasonState) => {
     if (!season) return;
@@ -190,10 +193,10 @@ export function FootballGame() {
 
   if (!draft) return null;
 
-  const xi: XiSource = { formationId: draft.formationId, lineup: draft.lineup, captainId: draft.captainId, difficulty: config.difficulty, title: userName, chemWeight: chemW };
+  const xi: XiSource = { formationId: draft.formationId, lineup: draft.lineup, captainId: draft.captainId, difficulty: config.difficulty, title: userName, rules };
   const sens = DIFFICULTY_PARAMS[config.difficulty].fbFitSensitivity;
-  const links = chemistryLinks(formation, lineupCards, leagueOf);
-  const mcUser = userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, false, chemW);
+  const links = chemistryLinks(formation, lineupCards, leagueOf, rules.extended);
+  const mcUser = userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, false, rules);
   const xiModal = <XiModal open={showXi} onClose={() => setShowXi(false)} xi={Object.keys(draft.lineup).length ? xi : null} />;
 
   /* ───────── SEASON ───────── */
@@ -224,7 +227,7 @@ export function FootballGame() {
   const filled = Object.keys(draft.lineup).length;
   const previewSlot = needCaptain ? (openCard ? captainSlots(draft, openCard)[0] ?? null : null) : draft.currentSlot;
   const shownOptions = options.filter((c) => !query.trim() || c.name.toLowerCase().includes(query.trim().toLowerCase()));
-  const chemOf = (c: FbPlayerSeason) => (previewSlot ? computeChemistry(formation, { ...lineupCards, [previewSlot]: c }, leagueOf, draft.captainId).perSlot[previewSlot] ?? 0 : undefined);
+  const chemOf = (c: FbPlayerSeason) => (previewSlot ? computeChemistry(formation, { ...lineupCards, [previewSlot]: c }, leagueOf, draft.captainId, rules.extended).perSlot[previewSlot] ?? 0 : undefined);
   const onPickCard = (c: FbPlayerSeason) => {
     setOpenCard(null); setCompareId(null); setQuery("");
     if (needCaptain) { const slots = captainSlots(draft, c.id); if (slots.length === 1) apply(pickCaptain(draft, c.id, slots[0])); else setCaptainPick(c.id); }
@@ -282,12 +285,12 @@ export function FootballGame() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)} data-testid="fb-chem-mode">⚗ Química {chem.total}/33</button>
-            {chemMode && <ChemLegend />}
+            {chemMode && <ChemLegend extended={rules.extended} />}
           </div>
           <div className="mx-auto w-full max-w-md lg:max-w-none">
             <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? selected : null} />
           </div>
-          {chemMode && <p className="text-xs text-muted">Química {chem.total}/33 → {chemistryEffect(chem.total, sens, chemW) >= 0 ? "+" : ""}{chemistryEffect(chem.total, sens, chemW)} en ataque y defensa del motor{chemW < 1 ? ` (en Historical Roulette la química pesa ${Math.round(chemW * 100)} %)` : ""}. Toca un jugador para ver sus vínculos.</p>}
+          {chemMode && <p className="text-xs text-muted">Química {chem.total}/33 → {chemistryEffect(chem.total, sens, chemW) >= 0 ? "+" : ""}{chemistryEffect(chem.total, sens, chemW)} en ataque y defensa del motor{chemW < 1 ? ` (Historical Roulette: también suman continente, idioma y estilo; la química pesa ${Math.round(chemW * 100)} %)` : ""}. Toca un jugador para ver sus vínculos.</p>}
 
           {isSquad && (
             <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
@@ -345,7 +348,7 @@ export function FootballGame() {
         )}
       </div>
       <FbPlayerSheet card={openCard ? FB_CARD_BY_ID[openCard] : null} compareWith={compareId && compareId !== openCard ? FB_CARD_BY_ID[compareId] : null}
-        formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} fitSensitivity={sens} chemWeight={chemW}
+        formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} fitSensitivity={sens} chemWeight={chemW} extended={rules.extended}
         pickLabel={needCaptain ? "Capitán" : "Elegir"} onPick={onPickCard} onClose={() => setOpenCard(null)} />
       {xiModal}
     </div>

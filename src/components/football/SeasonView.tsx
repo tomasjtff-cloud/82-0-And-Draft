@@ -266,11 +266,12 @@ function XiTab({ xi }: { xi: XiSource | null }) {
   if (!xi) return <p className="panel p-4 text-sm text-muted">No hay XI asociado a esta temporada.</p>;
   const fm = FORMATION_BY_ID[xi.formationId];
   const lc = lineupOf(xi.lineup);
-  const chem = computeChemistry(fm, lc, leagueOf, xi.captainId);
+  const ext = !!xi.rules?.extended;
+  const chem = computeChemistry(fm, lc, leagueOf, xi.captainId, ext);
   return (
     <section className="space-y-3" data-testid="fb-xi-tab">
-      <div className="flex flex-wrap items-center gap-2"><button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)}>⚗ Modo química</button>{chemMode && <ChemLegend />}</div>
-      <div className="mx-auto max-w-md"><Pitch formation={fm} lineup={lc} chem={chem.perSlot} captainId={xi.captainId} chemMode={chemMode} links={chemistryLinks(fm, lc, leagueOf)} focus={focus} onSlotClick={(id) => setFocus(focus === id ? null : id)} /></div>
+      <div className="flex flex-wrap items-center gap-2"><button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)}>⚗ Modo química</button>{chemMode && <ChemLegend extended={ext} />}</div>
+      <div className="mx-auto max-w-md"><Pitch formation={fm} lineup={lc} chem={chem.perSlot} captainId={xi.captainId} chemMode={chemMode} links={chemistryLinks(fm, lc, leagueOf, ext)} focus={focus} onSlotClick={(id) => setFocus(focus === id ? null : id)} /></div>
     </section>
   );
 }
@@ -282,8 +283,8 @@ function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource |
   const xiInfo = useMemo(() => {
     if (!xi) return null;
     const fm = FORMATION_BY_ID[xi.formationId]; const lc = lineupOf(xi.lineup);
-    const chem = computeChemistry(fm, lc, leagueOf, xi.captainId); const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
-    const w = xi.chemWeight ?? 1;
+    const chem = computeChemistry(fm, lc, leagueOf, xi.captainId, !!xi.rules?.extended); const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
+    const w = xi.rules?.weight ?? 1;
     return { chem: chem.total, effect: chemistryEffect(chem.total, sens, w), r: teamRatings(fm, lc, chem.total, sens, w), fm, lc, perSlot: chem.perSlot };
   }, [xi]);
   const topScorers = [...rows].filter((r) => r.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 3);

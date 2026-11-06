@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — 2026-11-06
+### Cambiado
+- Fútbol · Historical Roulette: química ampliada. Además de club/nación/liga, cada jugador puede sumar **+1 extra** (máximo uno) si comparte **idioma** con ≥3 del XI (p. ej. Messi–Parejo–Falcao: español), **familia de estilo** con ≥4 (Toque / Vértigo / Fuerza, derivada del arquetipo estimado) o **continente** con ≥4. Tope por jugador sigue en 3 (33 equipo). Calibrado con 300 XI aleatorios: media 16 → 24/33 (p10 20, p90 28).
+- Peso de la química en Roulette: 40 % → 70 %. FUT Draft sin cambios.
+- Modo química del campo: líneas de idioma (naranja) y estilo (violeta); el continente cuenta pero no se dibuja.
+- Compatibilidad: el historial guarda `chemVersion: 2`; partidas de 0.4.0/0.4.1 se reabren con sus reglas originales.
+
 ## 0.4.1 — 2026-11-06
 ### Cambiado
 - Fútbol · Historical Roulette: la química pesa el 40 % (`CHEM_WEIGHT.roulette = 0.4`) sobre ATT/DEF, porque club + década por posición vuelven los vínculos cuestión de suerte. En Normal el efecto pasa de −2,4…+1,6 a −0,96…+0,64. FUT Draft sin cambios. La vista previa, VER MI XI, la temporada y el Monte Carlo usan el mismo peso; el historial guarda el peso usado (partidas antiguas = 1, se reabren idénticas).

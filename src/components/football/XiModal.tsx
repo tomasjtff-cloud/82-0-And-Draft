@@ -5,17 +5,17 @@ import type { FbPlayerSeason } from "@/types/football";
 import { FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { DIFFICULTY_PARAMS, type Difficulty } from "@/lib/core/difficulty";
-import { chemistryEffect, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
-import { lineupOf, type FbSquadSnapshot } from "@/features/football-draft/squad";
+import { CLASSIC_CHEM, chemistryEffect, chemistryLinks, computeChemistry, teamRatings, type ChemRules } from "@/lib/ratings/football";
+import { lineupOf, snapshotRules, type FbSquadSnapshot } from "@/features/football-draft/squad";
 import { ChemLegend, Pitch } from "./Pitch";
 
-export interface XiSource { formationId: string; lineup: Record<string, string>; captainId: string | null; difficulty: Difficulty; title?: string; chemWeight?: number }
+export interface XiSource { formationId: string; lineup: Record<string, string>; captainId: string | null; difficulty: Difficulty; title?: string; rules?: ChemRules }
 
 export function XiButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
   return <button className="btn btn-sm" onClick={onClick} disabled={disabled} data-testid="view-xi">⚽ <span className="sm:hidden">Mi XI</span><span className="hidden sm:inline">Ver mi XI</span></button>;
 }
 
-export const xiFromSnapshot = (s: FbSquadSnapshot): XiSource => ({ formationId: s.formationId, lineup: s.lineup, captainId: s.captainId, difficulty: s.difficulty, title: s.clubName, chemWeight: s.chemWeight ?? 1 });
+export const xiFromSnapshot = (s: FbSquadSnapshot): XiSource => ({ formationId: s.formationId, lineup: s.lineup, captainId: s.captainId, difficulty: s.difficulty, title: s.clubName, rules: snapshotRules(s) });
 
 /** "VER MI XI": full pitch with the eleven in their positions, chemistry mode and per-player details. */
 export function XiModal({ open, onClose, xi, children }: { open: boolean; onClose: () => void; xi: XiSource | null; children?: React.ReactNode }) {
@@ -25,9 +25,10 @@ export function XiModal({ open, onClose, xi, children }: { open: boolean; onClos
     if (!xi) return null;
     const fm = FORMATION_BY_ID[xi.formationId];
     const lc: Record<string, FbPlayerSeason | undefined> = lineupOf(xi.lineup);
-    const chem = computeChemistry(fm, lc, leagueOf, xi.captainId);
+    const rules = xi.rules ?? CLASSIC_CHEM;
+    const chem = computeChemistry(fm, lc, leagueOf, xi.captainId, rules.extended);
     const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
-    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens, xi.chemWeight ?? 1), links: chemistryLinks(fm, lc, leagueOf), effect: chemistryEffect(chem.total, sens, xi.chemWeight ?? 1) };
+    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens, rules.weight), links: chemistryLinks(fm, lc, leagueOf, rules.extended), effect: chemistryEffect(chem.total, sens, rules.weight), extended: rules.extended };
   }, [xi]);
   return (
     <Sheet open={open} onClose={onClose} title={xi?.title ? `Mi XI · ${xi.title}` : "Mi XI"} testId="xi-modal">
@@ -40,7 +41,7 @@ export function XiModal({ open, onClose, xi, children }: { open: boolean; onClos
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)} data-testid="toggle-chem-mode">⚗ Modo química {chemMode ? "ON" : "OFF"}</button>
-            {chemMode && <ChemLegend />}
+            {chemMode && <ChemLegend extended={data.extended} />}
           </div>
           <div className="mx-auto max-w-md">
             <Pitch formation={data.fm} lineup={data.lc} chem={data.chem.perSlot} captainId={xi.captainId} chemMode={chemMode} links={data.links} focus={focus} onSlotClick={(id) => setFocus(focus === id ? null : id)} />

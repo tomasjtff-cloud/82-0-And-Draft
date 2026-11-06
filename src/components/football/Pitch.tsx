@@ -4,7 +4,7 @@ import type { FbPlayerSeason, Formation } from "@/types/football";
 import { slotFit, type ChemLink } from "@/lib/ratings/football";
 import { FbMiniCard } from "./FbCardView";
 
-const LINK_COLOR = { club: "#3ddc84", nation: "#f3dc94", league: "#7cc4ff" } as const;
+const LINK_COLOR = { club: "#3ddc84", nation: "#f3dc94", league: "#7cc4ff", language: "#ff9f5a", style: "#c58bff" } as const;
 
 /**
  * Interactive pitch. In chemistry mode the real chemistry links (shared club,
@@ -30,7 +30,7 @@ export function Pitch({ formation, lineup, chem, current, selected, captainId, o
         {shown.map((l) => {
           const a = pos[l.a], b = pos[l.b];
           if (!a || !b) return null;
-          const k = l.kinds.includes("club") ? "club" : l.kinds.includes("nation") ? "nation" : "league";
+          const k = (["club", "nation", "language", "league", "style"] as const).find((x) => l.kinds.includes(x)) ?? "league";
           return <line key={`${l.a}-${l.b}`} data-testid="chem-link" x1={a.x * 3} y1={a.y * 4} x2={b.x * 3} y2={b.y * 4} stroke={LINK_COLOR[k]} strokeOpacity={focus ? 0.95 : 0.55} strokeWidth={l.kinds.length >= 2 ? 3 : 1.6} strokeLinecap="round" />;
         })}
       </svg>
@@ -59,11 +59,13 @@ export function Pitch({ formation, lineup, chem, current, selected, captainId, o
   );
 }
 
-export function ChemLegend() {
+const LEGEND_ES = { club: "Club", nation: "Nación", league: "Liga", language: "Idioma", style: "Estilo" } as const;
+export function ChemLegend({ extended = false }: { extended?: boolean }) {
+  const kinds = extended ? (["club", "nation", "league", "language", "style"] as const) : (["club", "nation", "league"] as const);
   return (
     <div className="flex flex-wrap gap-3 text-[11px] text-muted">
-      {(["club", "nation", "league"] as const).map((k) => <span key={k} className="flex items-center gap-1"><span className="inline-block h-1 w-4 rounded" style={{ background: LINK_COLOR[k] }} />{k === "club" ? "Club" : k === "nation" ? "Nación" : "Liga"}</span>)}
-      <span>· línea gruesa = 2+ vínculos</span>
+      {kinds.map((k) => <span key={k} className="flex items-center gap-1"><span className="inline-block h-1 w-4 rounded" style={{ background: LINK_COLOR[k] }} />{LEGEND_ES[k]}</span>)}
+      <span>· línea gruesa = 2+ vínculos{extended ? " · continente cuenta sin línea" : ""}</span>
     </div>
   );
 }
