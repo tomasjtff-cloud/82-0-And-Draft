@@ -7,7 +7,7 @@ import { randomSeed } from "@/lib/core/rng";
 import { FORMATIONS, FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUBS, HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { FANTASY_ID, PL_CLUBS } from "@/lib/data/football/world";
-import { computeChemistry, teamRatings, slotFit } from "@/lib/ratings/football";
+import { chemistryEffect, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
 import { addHistory, KEYS, load, remove, save } from "@/lib/storage";
 import { animMs, useSettings } from "@/hooks/useSettings";
 import type { DraftMode, FbDraftState, FbPlayerSeason } from "@/types/football";
@@ -16,12 +16,14 @@ import {
   FB_CARD_BY_ID, canRespinClub, canRespinEra, captainSlots, changeFormation, createFbDraft, isFbComplete, pickCaptain, pickFb,
   respinClub, respinEra, slotById, swapSlots,
 } from "./engine";
-import { createSeason, isSeasonDone, simulateRest, stepSeason, stepToNextUserMatch, summarize, type SeasonState } from "@/features/football-simulation/season";
+import { createSeason, isSeasonDone, plTable, simulateRest, stepSeason, stepToNextUserMatch, summarize, type SeasonState } from "@/features/football-simulation/season";
+import { buildFbSnapshot, userTeamInput } from "./squad";
 import { DifficultySelector } from "@/components/common/DifficultySelector";
 import { Reel } from "@/components/common/Reel";
-import { StatBar } from "@/components/common/StatBar";
-import { FbCardView } from "@/components/football/FbCardView";
-import { FormationPreview, Pitch } from "@/components/football/Pitch";
+import { FbCandidateRow, FbCardView } from "@/components/football/FbCardView";
+import { FbPlayerSheet } from "@/components/football/FbPlayerSheet";
+import { XiButton, XiModal, type XiSource } from "@/components/football/XiModal";
+import { ChemLegend, FormationPreview, Pitch } from "@/components/football/Pitch";
 import { SeasonView } from "@/components/football/SeasonView";
 import { FootballMonteCarloPanel } from "@/components/football/MonteCarloPanel";
 
@@ -41,6 +43,13 @@ export function FootballGame() {
   const [inspect, setInspect] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [showXi, setShowXi] = useState(false);
+  const [openCard, setOpenCard] = useState<string | null>(null);
+  const [compareId, setCompareId] = useState<string | null>(null);
+  const [chemMode, setChemMode] = useState(false);
+  const [listOpen, setListOpen] = useState(true);
+  const [query, setQuery] = useState("");
+  const [revealed, setRevealed] = useState<string | null>(null);
 
   useEffect(() => {
     const s = load<Session | null>(KEYS.fbSession, null);
@@ -81,7 +90,7 @@ export function FootballGame() {
     if (!draft) return;
     setBusy(true);
     setTimeout(() => {
-      let s = createSeason(randomSeed(), config.difficulty, { clubId: config.clubId, name: userName, rating: ratings.ovr, att: ratings.att, def: ratings.def, replacedClubId: config.replacedClubId });
+      let s = createSeason(randomSeed(), config.difficulty, userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId));
       if (!live) s = simulateRest(s);
       set({ season: s, phase: "season", live });
       if (!live) record(s);
@@ -91,7 +100,9 @@ export function FootballGame() {
   const record = (s: SeasonState) => {
     const sum = summarize(s);
     const won = sum.trophies.filter((t) => t.status === "won").map((t) => t.comp);
-    addHistory({ game: "football", seed: s.seed, difficulty: s.difficulty, title: sum.quadruple ? "QUADRUPLE" : won.length ? won.join(" + ") : `${sum.plPosition}º PL`, detail: `${userName} · ${draft?.formationId} · OVR ${ratings.ovr}`, score: won.length });
+    const row = plTable(s).find((r) => r.team === s.userId)!;
+    addHistory({ game: "football", seed: s.seed, difficulty: s.difficulty, title: sum.quadruple ? "QUADRUPLE" : won.length ? won.join(" + ") : `${sum.plPosition}º PL`, detail: `${userName} · ${draft?.formationId} · OVR ${ratings.ovr}`, score: won.length,
+      ...(draft ? { football: buildFbSnapshot(draft, s.seed, config.clubId, userName, config.replacedClubId, { plPos: row.pos!, pts: row.pts, trophies: won }) } : {}) });
   };
   const advance = (fn: (s: SeasonState) => SeasonState) => {
     if (!season) return;
@@ -178,140 +189,164 @@ export function FootballGame() {
 
   if (!draft) return null;
 
+  const xi: XiSource = { formationId: draft.formationId, lineup: draft.lineup, captainId: draft.captainId, difficulty: config.difficulty, title: userName };
+  const sens = DIFFICULTY_PARAMS[config.difficulty].fbFitSensitivity;
+  const links = chemistryLinks(formation, lineupCards, leagueOf);
+  const mcUser = userTeamInput(draft.formationId, draft.lineup, draft.captainId, config.difficulty, config.clubId, userName, config.replacedClubId, false);
+  const xiModal = <XiModal open={showXi} onClose={() => setShowXi(false)} xi={Object.keys(draft.lineup).length ? xi : null} />;
+
   /* ───────── SEASON ───────── */
   if (session.phase === "season" && season) {
+    const done = isSeasonDone(season);
+    const row = plTable(season).find((r) => r.team === season.userId);
+    const sum = done ? summarize(season) : null;
+    const actual = done && row && sum ? { plPos: row.pos!, pts: row.pts, won: { PL: sum.trophies[0].status === "won", UCL: sum.trophies[1].status === "won", FA: sum.trophies[2].status === "won", EFL: sum.trophies[3].status === "won" } } : null;
     return (
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <SeasonView s={season} live={session.live} busy={busy}
+      <div className="mx-auto max-w-7xl px-3 py-6 sm:px-4" style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}>
+        <SeasonView s={season} live={session.live} busy={busy} xi={xi} headerExtra={<XiButton onClick={() => setShowXi(true)} />}
+          mcSlot={<FootballMonteCarloPanel user={mcUser} difficulty={config.difficulty} actual={actual} teamLabel={userName} />}
           onNextUser={() => advance(stepToNextUserMatch)} onNextEvent={() => advance((s) => stepSeason(s).state)} onSimRest={() => advance(simulateRest)} onNew={newDraft} />
+        {xiModal}
       </div>
     );
   }
 
-  /* ───────── DRAFT / SQUAD ───────── */
+  /* ───────── DRAFT / SQUAD (mobile-first) ───────── */
   const isSquad = session.phase === "squad";
   const slot = draft.currentSlot ? slotById(draft, draft.currentSlot) : null;
   const needCaptain = draft.mode === "fut" && !draft.captainId;
   const options = draft.options.map((id) => FB_CARD_BY_ID[id]);
   const club = draft.spin ? HIST_CLUB_BY_ID[draft.spin.clubId] : null;
   const reelMs = animMs(settings, 1000);
-  const inspected = inspect ? FB_CARD_BY_ID[inspect] : null;
+  const spinKey = draft.mode === "roulette" && draft.spin ? `${draft.currentSlot}:${draft.spin.clubId}:${draft.spin.decade}` : null;
+  const needSpin = !!spinKey && revealed !== spinKey && !isSquad;
+  const filled = Object.keys(draft.lineup).length;
+  const previewSlot = needCaptain ? (openCard ? captainSlots(draft, openCard)[0] ?? null : null) : draft.currentSlot;
+  const shownOptions = options.filter((c) => !query.trim() || c.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const chemOf = (c: FbPlayerSeason) => (previewSlot ? computeChemistry(formation, { ...lineupCards, [previewSlot]: c }, leagueOf, draft.captainId).perSlot[previewSlot] ?? 0 : undefined);
+  const onPickCard = (c: FbPlayerSeason) => {
+    setOpenCard(null); setCompareId(null); setQuery("");
+    if (needCaptain) { const slots = captainSlots(draft, c.id); if (slots.length === 1) apply(pickCaptain(draft, c.id, slots[0])); else setCaptainPick(c.id); }
+    else apply(pickFb(draft, c.id));
+  };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h1 className="font-display text-3xl">ULTIMATE <span className="text-gold">DRAFT</span></h1>
-        <span className="chip text-muted">{draft.mode === "fut" ? "FUT Draft" : "Historical Roulette"}</span>
-        <span className="chip text-muted">{draft.formationId}</span>
-        <span className="chip text-muted">{config.difficulty}</span>
-        <span className="chip text-muted">{userName}</span>
-        <span className="chip text-muted">{Object.keys(draft.lineup).length}/11</span>
-        <button className="btn btn-ghost btn-sm ml-auto" onClick={newDraft}>Abandonar</button>
-      </div>
+    <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-4 lg:pb-8" style={{ paddingBottom: isSquad ? "max(24px, env(safe-area-inset-bottom))" : "44dvh" }}>
+      <div className="lg:grid lg:grid-cols-[1fr_420px] lg:gap-6">
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-gold px-2.5 py-1 font-display text-lg leading-none text-black" data-testid="fb-progress">{isSquad ? "XI COMPLETO" : needCaptain ? "CAPITÁN" : `${slot?.pos ?? ""} · ${filled + 1}/11`}</span>
+            <div className="hidden gap-0.5 sm:flex" aria-hidden>{Array.from({ length: 11 }, (_, i) => <span key={i} className={`h-1.5 w-3 rounded-full ${i < filled ? "bg-gold" : "bg-white/10"}`} />)}</div>
+            <span className="min-w-0 flex-1 truncate text-right font-cond text-xs font-bold uppercase text-muted">{draft.mode === "fut" ? "FUT Draft" : "Historical Roulette"} · {draft.formationId} · {userName}</span>
+            <XiButton onClick={() => setShowXi(true)} disabled={!filled} />
+          </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-        <div className="min-w-0 space-y-5">
-          {!isSquad && (
-            <>
-              {draft.mode === "roulette" && draft.spin && club && slot && (
-                <section className="panel p-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <Reel label="Posición" value={slot.pos} pool={[slot.pos]} durationMs={0} accent="#f3dc94" />
-                    <Reel label="Club" value={club.name} pool={CLUB_NAMES} durationMs={reelMs} accent="#d9b45a" testId="fb-reel-club" />
-                    <Reel label="Década" value={draft.spin.decade} pool={FB_DECADES} durationMs={reelMs} accent="#d9b45a" testId="fb-reel-era" />
-                  </div>
-                </section>
-              )}
-              {draft.mode === "fut" && (
-                <section className="panel p-4">
-                  <div className="font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">{needCaptain ? "Paso 1 · Elige a tu capitán" : `Elige tu ${slot?.pos} (${slot?.id})`}</div>
-                  {draft.filter && <div className="mt-1 text-sm text-gold-2">Filtro activo: {draft.filter.clubId ? HIST_CLUB_BY_ID[draft.filter.clubId].name : draft.filter.decade}</div>}
-                </section>
-              )}
-              {!needCaptain && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="btn btn-sm" disabled={!canRespinClub(draft)} onClick={() => apply(respinClub(draft), false)} data-testid="fb-respin-club">↻ Re-spin club <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.club}</span></button>
-                  <button className="btn btn-sm" disabled={!canRespinEra(draft)} onClick={() => apply(respinEra(draft), false)} data-testid="fb-respin-era">↻ Re-spin era <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.era}</span></button>
+          {!isSquad && draft.mode === "roulette" && draft.spin && club && slot && (
+            <section className="panel p-3">
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-2">
+                <Reel label="Posición" value={slot.pos} pool={[slot.pos]} durationMs={0} accent="#f3dc94" />
+                <Reel label="Club" value={needSpin ? "?" : club.name} pool={needSpin ? ["?"] : CLUB_NAMES} durationMs={needSpin ? 0 : reelMs} accent="#d9b45a" testId="fb-reel-club" />
+                <Reel label="Década" value={needSpin ? "?" : draft.spin.decade} pool={needSpin ? ["?"] : FB_DECADES} durationMs={needSpin ? 0 : reelMs} accent="#d9b45a" testId="fb-reel-era" />
+              </div>
+              {needSpin ? <button className="btn btn-gold mt-3 w-full py-4 text-xl" onClick={() => setRevealed(spinKey)} data-testid="fb-spin-btn">🎰 GIRAR</button> : (
+                <div className="mt-2 flex gap-2">
+                  <button className="btn btn-sm flex-1" disabled={!canRespinClub(draft)} onClick={() => { apply(respinClub(draft), false); setRevealed(null); }} data-testid="fb-respin-club">↻ Club <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.club}</span></button>
+                  <button className="btn btn-sm flex-1" disabled={!canRespinEra(draft)} onClick={() => { apply(respinEra(draft), false); setRevealed(null); }} data-testid="fb-respin-era">↻ Época <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.era}</span></button>
                 </div>
               )}
-              {error && <p role="alert" className="text-sm text-loss">{error}</p>}
-              {needCaptain && captainPick ? (
-                <div className="panel p-4">
-                  <p className="mb-3 text-sm">¿Dónde juega <b>{FB_CARD_BY_ID[captainPick].name}</b>?</p>
-                  <div className="flex flex-wrap gap-2">
-                    {captainSlots(draft, captainPick).map((sid) => (
-                      <button key={sid} className="btn btn-gold btn-sm" onClick={() => { apply(pickCaptain(draft, captainPick, sid)); setCaptainPick(null); }} data-testid={`fb-pick-slot-${sid}`}>{sid}</button>
-                    ))}
-                    <button className="btn btn-sm btn-ghost" onClick={() => setCaptainPick(null)}>Cancelar</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="fb-options">
-                  {options.map((c, i) => (
-                    <FbCardView key={c.id} card={c} index={i} pickLabel={needCaptain ? "Capitán" : "Elegir"}
-                      onPick={() => {
-                        if (needCaptain) {
-                          const slots = captainSlots(draft, c.id);
-                          if (slots.length === 1) apply(pickCaptain(draft, c.id, slots[0])); else setCaptainPick(c.id);
-                        } else apply(pickFb(draft, c.id));
-                      }} />
-                  ))}
-                </div>
-              )}
-            </>
+            </section>
           )}
+          {!isSquad && draft.mode === "fut" && (
+            <section className="panel p-3">
+              <div className="font-cond text-sm font-bold uppercase tracking-[.15em]">{needCaptain ? "Elige a tu capitán entre 5 estrellas" : `5 cartas para ${slot?.pos} (${slot?.id})`}</div>
+              {draft.filter && <div className="mt-1 text-xs text-gold-2">Filtro activo: {draft.filter.clubId ? HIST_CLUB_BY_ID[draft.filter.clubId].name : draft.filter.decade}</div>}
+              {!needCaptain && (
+                <div className="mt-2 flex gap-2">
+                  <button className="btn btn-sm flex-1" disabled={!canRespinClub(draft)} onClick={() => apply(respinClub(draft), false)} data-testid="fb-respin-club">↻ Filtro club <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.club}</span></button>
+                  <button className="btn btn-sm flex-1" disabled={!canRespinEra(draft)} onClick={() => apply(respinEra(draft), false)} data-testid="fb-respin-era">↻ Filtro época <span className="rounded bg-white/10 px-1.5 font-mono">{draft.respins.era}</span></button>
+                </div>
+              )}
+            </section>
+          )}
+          {error && <p role="alert" className="text-sm text-loss">{error}</p>}
+          {captainPick && (
+            <div className="panel p-3">
+              <p className="mb-2 text-sm">¿Dónde juega <b>{FB_CARD_BY_ID[captainPick].name}</b>?</p>
+              <div className="flex flex-wrap gap-2">
+                {captainSlots(draft, captainPick).map((sid) => <button key={sid} className="btn btn-gold btn-sm" onClick={() => { apply(pickCaptain(draft, captainPick, sid)); setCaptainPick(null); }} data-testid={`fb-pick-slot-${sid}`}>{sid}</button>)}
+                <button className="btn btn-sm btn-ghost" onClick={() => setCaptainPick(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)} data-testid="fb-chem-mode">⚗ Química {chem.total}/33</button>
+            {chemMode && <ChemLegend />}
+          </div>
+          <div className="mx-auto w-full max-w-md lg:max-w-none">
+            <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={isSquad ? null : draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} chemMode={chemMode} links={links} focus={chemMode ? selected : null} />
+          </div>
+          {chemMode && <p className="text-xs text-muted">Química {chem.total}/33 → {chemistryEffect(chem.total, sens) >= 0 ? "+" : ""}{chemistryEffect(chem.total, sens)} en ataque y defensa del motor. Toca un jugador para ver sus vínculos.</p>}
 
           {isSquad && (
             <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <div className="panel p-5">
-                <div className="font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Once completo</div>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5" data-testid="fb-chemistry">
+              <div className="panel p-4">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" data-testid="fb-chemistry">
                   {[["TEAM OVR", ratings.ovr], ["ATTACK", ratings.attack], ["MIDFIELD", ratings.midfield], ["DEFENSE", ratings.defense], ["CHEMISTRY", `${chem.total}/33`]].map(([k, v]) => (
-                    <div key={k as string} className="rounded-xl bg-white/5 px-3 py-3 text-center">
-                      <div className="font-cond text-[11px] font-bold tracking-wider text-muted">{k}</div>
-                      <div className="font-display text-3xl tabular">{v}</div>
-                    </div>
+                    <div key={k as string} className="rounded-xl bg-white/5 px-2 py-2 text-center"><div className="font-cond text-[10px] font-bold tracking-wider text-muted">{k}</div><div className="font-display text-2xl tabular">{v}</div></div>
                   ))}
                 </div>
-                {ratings.notes.length > 0 && <ul className="mt-3 space-y-1 text-xs text-gold-2">{ratings.notes.map((n) => <li key={n}>· {n}</li>)}</ul>}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                {ratings.notes.length > 0 && <ul className="mt-2 space-y-1 text-xs text-gold-2">{ratings.notes.map((n) => <li key={n}>· {n}</li>)}</ul>}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <label className="text-sm text-muted">Formación:
-                    <select className="ml-2 rounded-lg border border-line bg-surface px-2 py-1 text-text" value={draft.formationId}
+                    <select className="ml-2 rounded-lg border border-line bg-surface px-2 py-1 text-base text-text" value={draft.formationId}
                       onChange={(e) => { const r = changeFormation(draft, e.target.value); if (r.ok) set({ draft: r.state }); else setError(r.error); }}>
                       {FORMATIONS.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                     </select>
                   </label>
-                  <span className="text-xs text-muted">Toca dos jugadores en el campo para intercambiarlos. Borde rojo = fuera de posición.</span>
+                  <span className="text-xs text-muted">Toca dos jugadores para intercambiarlos. Borde rojo = fuera de posición.</span>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button className="btn btn-gold px-6 py-4 text-base" disabled={busy} onClick={() => beginSeason(false)} data-testid="fb-quick-sim">{busy ? "Simulando…" : "Quick sim · temporada completa"}</button>
-                <button className="btn px-6 py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">Live season · jornada a jornada</button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button className="btn btn-gold py-4 text-base" disabled={busy} onClick={() => beginSeason(false)} data-testid="fb-quick-sim">{busy ? "Simulando…" : "Quick sim · temporada completa"}</button>
+                <button className="btn py-4 text-base" disabled={busy} onClick={() => beginSeason(true)} data-testid="fb-live-sim">Live season · jornada a jornada</button>
               </div>
-              <FootballMonteCarloPanel user={{ clubId: config.clubId, name: userName, rating: ratings.ovr, att: ratings.att, def: ratings.def, replacedClubId: config.replacedClubId }} difficulty={config.difficulty} />
-              {inspected && <div className="max-w-xs"><FbCardView card={inspected} /></div>}
+              <FootballMonteCarloPanel user={mcUser} difficulty={config.difficulty} teamLabel={userName} />
+              {inspect && <div className="mx-auto max-w-xs"><FbCardView card={FB_CARD_BY_ID[inspect]} /></div>}
             </motion.section>
           )}
+          <button className="btn btn-ghost btn-sm" onClick={newDraft}>Abandonar draft</button>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <Pitch formation={formation} lineup={lineupCards} chem={chem.perSlot} current={draft.currentSlot} selected={selected} captainId={draft.captainId} onSlotClick={onSlotClick} />
-          <div className="panel p-4">
-            <div className="mb-2 flex justify-between font-cond text-sm font-bold uppercase"><span>Equipo</span><span className="text-muted">Química {chem.total}/33</span></div>
-            <div className="space-y-1">
-              <StatBar label="Team OVR" value={ratings.ovr} color="var(--color-gold)" />
-              <StatBar label="Ataque" value={ratings.attack} color="var(--color-gold)" />
-              <StatBar label="Medio" value={ratings.midfield} color="var(--color-gold)" />
-              <StatBar label="Defensa" value={ratings.defense} color="var(--color-gold)" />
-              <StatBar label="Portero" value={ratings.gk} color="var(--color-gold)" />
-              <StatBar label="Química" value={chem.total} max={33} color="var(--color-win)" />
-            </div>
-            {selected && draft.lineup[selected] && (
-              <p className="mt-2 text-xs text-muted">{FB_CARD_BY_ID[draft.lineup[selected]].name}: {chem.links[selected]?.join(", ") || "sin vínculos"} · ajuste posicional {Math.round(slotFit(FB_CARD_BY_ID[draft.lineup[selected]], slotById(draft, selected).pos) * 100)}%</p>
+        {!isSquad && !needSpin && !captainPick && (
+          <aside className="fixed inset-x-0 bottom-0 z-40 flex max-h-[42dvh] flex-col rounded-t-3xl border-t border-line-strong bg-surface/95 shadow-[0_-12px_40px_rgba(0,0,0,.6)] backdrop-blur lg:static lg:z-auto lg:max-h-none lg:rounded-2xl lg:border lg:bg-surface lg:shadow-none"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }} data-testid="fb-drawer">
+            <button className="flex items-center justify-between gap-2 px-4 pb-2 pt-3 text-left lg:pointer-events-none" onClick={() => setListOpen((v) => !v)} aria-expanded={listOpen}>
+              <span className="min-w-0">
+                <span className="mx-auto mb-1 block h-1 w-10 rounded-full bg-white/20 lg:hidden" />
+                <span className="block truncate font-cond text-sm font-bold uppercase tracking-wide">{needCaptain ? "Candidatos a capitán" : draft.mode === "roulette" && club ? `${club.name} · ${draft.spin!.decade} · ${slot?.pos}` : `Cartas para ${slot?.pos}`}</span>
+                <span className="block text-[11px] text-muted">{options.length} carta{options.length === 1 ? "" : "s"} · toca para ver ficha y química · ⇄ para comparar</span>
+              </span>
+              <span className="text-muted lg:hidden">{listOpen ? "▼" : "▲"}</span>
+            </button>
+            {listOpen && (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3 scrollbar-thin">
+                {options.length > 3 && <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar jugador…" enterKeyHint="search" className="mb-1 w-full rounded-lg border border-line bg-ink px-3 py-2 text-base" data-testid="fb-search" />}
+                <div className="divide-y divide-line" data-testid="fb-options">
+                  {shownOptions.map((c) => (
+                    <FbCandidateRow key={c.id} card={c} ownChem={chemOf(c)} onOpen={() => setOpenCard(c.id)} comparing={compareId === c.id}
+                      onCompare={() => setCompareId(compareId === c.id ? null : c.id)} />
+                  ))}
+                </div>
+              </div>
             )}
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
+      <FbPlayerSheet card={openCard ? FB_CARD_BY_ID[openCard] : null} compareWith={compareId && compareId !== openCard ? FB_CARD_BY_ID[compareId] : null}
+        formation={formation} lineup={lineupCards} slotId={previewSlot} captainId={needCaptain ? openCard : draft.captainId} fitSensitivity={sens}
+        pickLabel={needCaptain ? "Capitán" : "Elegir"} onPick={onPickCard} onClose={() => setOpenCard(null)} />
+      {xiModal}
     </div>
   );
 }

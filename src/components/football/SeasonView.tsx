@@ -6,8 +6,17 @@ import { plTable, summarize, uclTable, nextUserFixture, isSeasonDone, type Seaso
 import { scoreline } from "@/features/football-simulation/match";
 import { COMP_NAME } from "@/features/football-simulation/calendar";
 import { Celebration } from "@/components/common/Celebration";
+import { aggregatePlayerStats, teamAwards, userMatches as userMatchesOf } from "@/features/football-simulation/player-stats";
+import { FbMatchList, FbPlayerStatsView, SeasonHighlights, noDetail } from "./SeasonExtras";
+import { ChemLegend, Pitch } from "./Pitch";
+import { FORMATION_BY_ID } from "@/lib/data/football/formations";
+import { leagueOf } from "@/lib/data/football/clubs";
+import { DIFFICULTY_PARAMS } from "@/lib/core/difficulty";
+import { chemistryEffect, chemistryLinks, computeChemistry, teamRatings } from "@/lib/ratings/football";
+import { lineupOf } from "@/features/football-draft/squad";
+import type { XiSource } from "./XiModal";
 
-type Tab = "summary" | "pl" | "ucl" | "fa" | "efl" | "mine";
+type Tab = "summary" | "xi" | "players" | "mine" | "pl" | "ucl" | "fa" | "efl" | "mc";
 const STATUS: Record<TrophyResult["status"], { label: string; cls: string }> = {
   won: { label: "WON", cls: "bg-gold text-black" },
   "runner-up": { label: "RUNNER-UP", cls: "bg-white/80 text-black" },
@@ -17,8 +26,9 @@ const STATUS: Record<TrophyResult["status"], { label: string; cls: string }> = {
 };
 const COMP_KEY: Record<CompId, string> = { PL: "pl", UCL: "ucl", FA: "fa", EFL: "efl" };
 
-export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew, busy }: {
+export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew, busy, xi, headerExtra, mcSlot }: {
   s: SeasonState; live: boolean; onNextUser: () => void; onNextEvent: () => void; onSimRest: () => void; onNew: () => void; busy: boolean;
+  xi?: XiSource | null; headerExtra?: React.ReactNode; mcSlot?: React.ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>("summary");
   const done = isSeasonDone(s);
@@ -53,6 +63,7 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
               <button className="btn btn-sm" disabled={busy} onClick={onSimRest} data-testid="fb-sim-rest">Simular resto</button>
             </div>
           )}
+          {headerExtra}
           <button className="btn btn-ghost btn-sm" onClick={onNew} data-testid="fb-new">Nuevo draft</button>
         </div>
         {!done && (
@@ -88,41 +99,21 @@ export function SeasonView({ s, live, onNextUser, onNextEvent, onSimRest, onNew,
       </section>
 
       <div className="flex gap-1 overflow-x-auto scrollbar-thin" role="tablist">
-        {([["summary", "Resumen"], ["pl", "Premier League"], ["ucl", "Champions"], ["fa", "FA Cup"], ["efl", "Carabao Cup"], ["mine", "Mis partidos"]] as [Tab, string][]).map(([k, l]) => (
+        {([["summary", "Resumen"], ["xi", "Mi XI"], ["players", "Mis jugadores"], ["mine", "Partidos"], ["pl", "Premier League"], ["ucl", "Champions"], ["fa", "FA Cup"], ["efl", "Carabao Cup"], ["mc", "Monte Carlo"]] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`fb-tab-${k}`}
             className={`whitespace-nowrap rounded-lg px-3 py-2 font-cond text-sm font-bold uppercase tracking-wider ${tab === k ? "bg-surface-3 text-text" : "text-muted hover:text-text"}`}>{l}</button>
         ))}
       </div>
 
-      {tab === "summary" && (
-        <section className="panel p-5">
-          <h3 className="font-cond text-lg font-bold uppercase tracking-wide">Resumen de temporada</h3>
-          <ul className="mt-2 space-y-1.5 text-sm text-muted">{sum.narrative.map((n) => <li key={n}>· {n}</li>)}</ul>
-          {s.notes.length > 0 && <ul className="mt-4 space-y-1 text-xs text-gold-2">{s.notes.map((n) => <li key={n}>⚑ {n}</li>)}</ul>}
-          <p className="mt-4 text-[11px] text-dim">Resultados del videojuego generados con un modelo probabilístico (Poisson). No son predicciones deportivas reales.</p>
-        </section>
-      )}
+      {tab === "summary" && <SummaryTab s={s} xi={xi ?? null} narrative={sum.narrative} done={done} />}
+      {tab === "xi" && <XiTab xi={xi ?? null} />}
+      {tab === "players" && <FbPlayerStatsView s={s} />}
+      {tab === "mc" && (mcSlot ?? <p className="text-sm text-muted">Monte Carlo no disponible.</p>)}
       {tab === "pl" && <PlTab s={s} />}
       {tab === "ucl" && <UclTab s={s} />}
       {tab === "fa" && <CupTab s={s} comp="FA" stages={["R3", "R4", "R5", "QF", "SF", "F"]} />}
       {tab === "efl" && <CupTab s={s} comp="EFL" stages={["R2", "R3", "R4", "QF", "SF", "F"]} />}
-      {tab === "mine" && (
-        <section className="panel overflow-x-auto p-2">
-          <table className="w-full text-sm">
-            <tbody>
-              {userMatches.map((m) => (
-                <tr key={m.id} className="border-b border-line">
-                  <td className="px-2 py-1.5 font-mono text-xs text-muted">{m.date}</td>
-                  <td className="px-2 py-1.5 text-xs text-muted">{COMP_NAME[m.comp]} · {m.stage}</td>
-                  <td className="px-2 py-1.5">{name(m.home)} <span className="font-mono">{scoreline(m)}</span> {name(m.away)}</td>
-                  <td className="px-2 py-1.5"><FormDot r={result(m, s.userId)} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {userMatches.length === 0 && <p className="p-4 text-sm text-muted">Aún no se han jugado partidos.</p>}
-        </section>
-      )}
+      {tab === "mine" && <FbMatchList s={s} />}
     </div>
   );
 }
@@ -265,6 +256,65 @@ function CupTab({ s, comp, stages }: { s: SeasonState; comp: CompId; stages: str
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function XiTab({ xi }: { xi: XiSource | null }) {
+  const [chemMode, setChemMode] = useState(true);
+  const [focus, setFocus] = useState<string | null>(null);
+  if (!xi) return <p className="panel p-4 text-sm text-muted">No hay XI asociado a esta temporada.</p>;
+  const fm = FORMATION_BY_ID[xi.formationId];
+  const lc = lineupOf(xi.lineup);
+  const chem = computeChemistry(fm, lc, leagueOf, xi.captainId);
+  return (
+    <section className="space-y-3" data-testid="fb-xi-tab">
+      <div className="flex flex-wrap items-center gap-2"><button className={`btn btn-sm ${chemMode ? "border-win text-win" : ""}`} onClick={() => setChemMode((v) => !v)}>⚗ Modo química</button>{chemMode && <ChemLegend />}</div>
+      <div className="mx-auto max-w-md"><Pitch formation={fm} lineup={lc} chem={chem.perSlot} captainId={xi.captainId} chemMode={chemMode} links={chemistryLinks(fm, lc, leagueOf)} focus={focus} onSlotClick={(id) => setFocus(focus === id ? null : id)} /></div>
+    </section>
+  );
+}
+
+function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource | null; narrative: string[]; done: boolean }) {
+  const row = plTable(s).find((r) => r.team === s.userId)!;
+  const rows = useMemo(() => (noDetail(s) ? [] : aggregatePlayerStats(s)), [s]);
+  const awards = useMemo(() => teamAwards(rows, userMatchesOf(s).length), [rows, s]);
+  const xiInfo = useMemo(() => {
+    if (!xi) return null;
+    const fm = FORMATION_BY_ID[xi.formationId]; const lc = lineupOf(xi.lineup);
+    const chem = computeChemistry(fm, lc, leagueOf, xi.captainId); const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
+    return { chem: chem.total, effect: chemistryEffect(chem.total, sens), r: teamRatings(fm, lc, chem.total, sens), fm, lc, perSlot: chem.perSlot };
+  }, [xi]);
+  const topScorers = [...rows].filter((r) => r.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 3);
+  return (
+    <section className="space-y-4" data-testid="fb-summary">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <div className="panel p-5">
+          <div className="font-cond text-xs font-bold uppercase tracking-[.2em] text-muted">Premier League {done ? "· final" : "· provisional"}</div>
+          <div className="mt-1 flex flex-wrap items-end gap-4">
+            <div className="font-display text-6xl leading-none" data-testid="fb-final-pos">{row.pos}º</div>
+            <div className="grid grid-cols-3 gap-2 font-mono text-sm sm:grid-cols-6">{[["Pts", row.pts], ["V", row.w], ["E", row.d], ["D", row.l], ["GF", row.gf], ["GC", row.ga]].map(([k, v]) => <div key={k as string} className="rounded-lg bg-white/5 px-2 py-1 text-center"><div className="text-[10px] text-muted">{k}</div>{v}</div>)}</div>
+          </div>
+          <ul className="mt-3 space-y-1 text-sm text-muted">{narrative.map((n) => <li key={n}>· {n}</li>)}</ul>
+          {s.notes.length > 0 && <ul className="mt-3 space-y-1 text-xs text-gold-2">{s.notes.map((n) => <li key={n}>⚑ {n}</li>)}</ul>}
+        </div>
+        {xiInfo && (
+          <div className="panel p-4">
+            <div className="flex items-center justify-between"><span className="font-cond text-sm font-bold uppercase tracking-wide">Mi XI · {xi!.formationId}</span><span className="font-mono text-xs">OVR {xiInfo.r.ovr} · Quím {xiInfo.chem}/33</span></div>
+            <div className="mx-auto mt-2 max-w-[260px]"><Pitch formation={xiInfo.fm} lineup={xiInfo.lc} chem={xiInfo.perSlot} captainId={xi!.captainId} compact /></div>
+            <p className="mt-2 text-[11px] text-muted">Química {xiInfo.chem}/33 → {xiInfo.effect >= 0 ? "+" : ""}{xiInfo.effect} en ataque y defensa · Ataque {xiInfo.r.attack} · Medio {xiInfo.r.midfield} · Defensa {xiInfo.r.defense}</p>
+          </div>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl bg-gold/15 px-3 py-2"><div className="text-[10px] uppercase text-muted">MVP del equipo</div><div className="font-cond text-lg font-bold uppercase" data-testid="fb-mvp">{awards.mvp?.name ?? "—"}</div><div className="font-mono text-xs">{awards.mvp ? `${awards.mvp.rating.toFixed(2)} nota · ${awards.mvp.goals} G · ${awards.mvp.assists} A` : ""}</div></div>
+          <div className="rounded-xl bg-white/5 px-3 py-2"><div className="text-[10px] uppercase text-muted">Máximos goleadores</div>{topScorers.map((r) => <div key={r.key} className="flex justify-between text-sm"><span className="truncate">{r.name}</span><b className="font-mono">{r.goals}</b></div>)}</div>
+          <div className="rounded-xl bg-white/5 px-3 py-2"><div className="text-[10px] uppercase text-muted">Máximo asistidor</div><div className="font-cond text-lg font-bold uppercase">{awards.topAssister?.name ?? "—"}</div><div className="font-mono text-xs">{awards.topAssister?.assists ?? 0} asistencias</div></div>
+        </div>
+      )}
+      <SeasonHighlights s={s} />
+      <p className="text-[11px] text-dim">Resultados del videojuego generados con un modelo probabilístico (Poisson). No son predicciones deportivas reales.</p>
     </section>
   );
 }

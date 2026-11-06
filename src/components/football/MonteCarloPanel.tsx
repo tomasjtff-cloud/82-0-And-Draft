@@ -25,7 +25,8 @@ function Bars({ labels, counts, total, testId }: { labels: readonly string[]; co
 }
 
 /** "SIMULAR 1.000 TEMPORADAS" — full seasons with the real engine, in a Web Worker. */
-export function FootballMonteCarloPanel({ user, difficulty }: { user: UserTeamInput; difficulty: Difficulty }) {
+export interface McActual { plPos: number; pts: number; won: { PL: boolean; UCL: boolean; FA: boolean; EFL: boolean } }
+export function FootballMonteCarloPanel({ user, difficulty, actual, teamLabel }: { user: UserTeamInput; difficulty: Difficulty; actual?: McActual | null; teamLabel?: string }) {
   const mc = useFootballMonteCarlo();
   const [seed, setSeed] = useState(() => randomSeed());
   const s = mc.summary;
@@ -33,7 +34,7 @@ export function FootballMonteCarloPanel({ user, difficulty }: { user: UserTeamIn
   return (
     <section className="panel p-5" data-testid="fb-mc-panel">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-cond text-lg font-bold uppercase tracking-wide">Monte Carlo · temporadas completas</h3>
+        <h3 className="font-cond text-lg font-bold uppercase tracking-wide">Monte Carlo · {teamLabel ?? "temporadas completas"}</h3>
         <span className="text-xs text-muted">Semilla <span className="font-mono">{seed}</span> <button className="underline" onClick={() => setSeed(randomSeed())} disabled={running}>cambiar</button></span>
       </div>
       <p className="mt-1 text-xs text-muted">Cada temporada usa el motor real (Premier, Champions, FA Cup, Carabao, calendario, localía, fatiga, química y dificultad) con una semilla independiente y reproducible.</p>
@@ -62,6 +63,16 @@ export function FootballMonteCarloPanel({ user, difficulty }: { user: UserTeamIn
               </div>
             ))}
           </div>
+          {actual && (
+            <div className="rounded-xl border border-gold/40 bg-gold/5 p-3 text-sm" data-testid="fb-mc-compare">
+              <div className="font-cond text-xs font-bold uppercase tracking-wide text-gold-2">Tu temporada jugada vs. la distribución</div>
+              <ul className="mt-1 space-y-0.5">
+                <li>Terminaste <b>{actual.plPos}º</b> con <b>{actual.pts} pts</b>: igual o mejor que en el <b>{((s.posDist.slice(0, actual.plPos).reduce((a, b) => a + b, 0) / s.runs) * 100).toFixed(1)}%</b> de las simulaciones; puntos {actual.pts >= s.avgPts ? "por encima" : "por debajo"} de la media ({s.avgPts.toFixed(1)}, z = {s.sdPts ? ((actual.pts - s.avgPts) / s.sdPts).toFixed(2) : "—"}).</li>
+                {(["PL", "UCL", "FA", "EFL"] as const).filter((k) => actual.won[k]).map((k) => <li key={k}>Ganaste {({ PL: "la Premier League", UCL: "la Champions", FA: "la FA Cup", EFL: "la Carabao Cup" })[k]}: ocurre en el {(s.titles[k].p * 100).toFixed(1)}% de las simulaciones.</li>)}
+                {Object.values(actual.won).every(Boolean) && <li className="text-gold">Tu quadruple aparece en el {(s.titles.quadruple.p * 100).toFixed(2)}% de las simulaciones.</li>}
+              </ul>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
             {[["Posición media PL", s.avgPos.toFixed(1)], ["Puntos medios", `${s.avgPts.toFixed(1)} ± ${s.sdPts.toFixed(1)}`], ["Goles a favor", s.avgGf.toFixed(1)], ["Goles en contra", s.avgGa.toFixed(1)]].map(([k, v]) => (
               <div key={k} className="rounded-lg bg-white/5 px-3 py-2"><div className="text-[11px] text-muted">{k}</div><div className="font-mono">{v}</div></div>

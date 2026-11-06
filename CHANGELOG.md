@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-11-06 (Legends Lab V3)
+### Añadido
+- NBA: ciudad + nombre del equipo personalizables (validados, por defecto "Legends Lab"), visibles en draft, 82 partidos, clasificación, playoffs, Finals, resultados, Monte Carlo, quinteto e historial. Solo cosmético: no toca semillas, calendario, rivales ni dificultad. Partidas antiguas siguen abriéndose.
+- Fútbol: botón permanente **VER MI XI** (draft, XI completo, Live, Quick Sim, final de temporada, Monte Carlo, historial) con campo, química individual, capitán, Team OVR, ATT/MID/DEF, química /33, vínculos y explicación.
+- Fútbol: draft rediseñado al estilo NBA (indicador de posición/progreso, ruletas con GIRAR, campo central, cajón inferior con candidatos, buscador, ficha detallada con ELEGIR, comparación entre dos candidatos, atributos de portero, estimados marcados con *).
+- Vista previa de química antes de elegir (actual, esperada, delta, quién gana/pierde, vínculos nuevos, penalización por posición) usando el motor real; modo química en el campo con vínculos e impacto en ATT/DEF.
+- Eventos individuales simulados para los partidos del usuario (`events.ts`, RNG `fb-events:` separado: no altera marcadores): goleadores, asistencias, tiros, pases, tarjetas, minutos, notas, xG/xA estimados, paradas/porterías a cero. Penales de tanda excluidos.
+- "Mis jugadores": estadísticas por competición (PL/UCL/FA/EFL/Todas), orden por goles/asistencias/PJ/minutos/nota, premios (pichichi, asistente, mejor jugador, portero, MVP), récords, historial de partidos con detalle.
+- Resumen de fin de temporada; Monte Carlo integrado como pestaña con comparación temporada jugada vs distribución.
+- Historial de fútbol: snapshot del XI (11 IDs estables, formación, capitán, química, resultado) → "Ver XI" y "Abrir temporada" (reconstrucción determinista). Entradas antiguas muestran aviso.
+### Tests
+- 72 unitarios + e2e ampliado (identidad NBA, preview = química final, XI en draft/temporada/historial, estadísticas, detalle de partido, reapertura idéntica desde historial, iPhone 13 sin scroll horizontal).
+
 ## 0.3.1 — 2026-11-06
 ### Cambiado
 - Escala NBA v2.1 con las anclas de referencia del usuario: primes de Jordan y LeBron = 99, LaMelo 2022-23 = 82. Nodos de impacto más altos, menos castigo por eficiencia en el índice de producción (0,57 impacto / 0,43 producción). Pivote del modelo de equipo 79 → 80,5 para que los récords no se inflen (leyendas ≈ 73-74 victorias en Normal).

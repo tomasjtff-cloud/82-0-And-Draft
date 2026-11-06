@@ -47,6 +47,7 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 - Cancha interactiva, intercambio de posiciones válidas, evaluación de equipo (ataque, defensa, creación, rebote, aro, tiro, versatilidad, química).
 - Simulación probabilística de 82 partidos con semilla, localía, back-to-backs y dificultad; liga completa de 31 equipos, clasificación y **playoffs al mejor de 7 hasta el anillo**; box scores y **estadísticas simuladas de tus jugadores** (temporada y playoffs); Monte Carlo con probabilidad de anillo.
 - Ratings v2 calibrados contra RAPTOR (FiveThirtyEight) con escala de tiers; un jugador por lista (su mejor temporada, las demás consultables); **química explicable** con vista previa antes de elegir; botón **VER MI QUINTETO** en draft, resultados e historial; diseño mobile-first (ruletas + GIRAR, cancha con camisetas, lista inferior con filtros).
+- Ciudad y nombre del equipo personalizables (solo cosmético).
 - Mejor récord, historial y draft en curso guardados en el navegador.
 
 **Football Ultimate Draft**
@@ -57,6 +58,9 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 - Temporada 2026/27 (escenario de juego): Premier League completa (20 clubes, 380 partidos), Champions League con fase liga de 36 equipos + playoffs + eliminatorias, FA Cup desde 3ª ronda, Carabao Cup desde 2ª ronda.
 - Quick Sim y Live Season (partido a partido / evento a evento, se puede continuar más tarde).
 - **Monte Carlo de temporadas completas** (100/500/1.000/2.000) en Web Worker: probabilidad de cada título y del quadruple con IC95%, posición/puntos medios, distribución de posiciones y rondas alcanzadas.
+- **VER MI XI** en todo momento; draft móvil con cajón de candidatos, ficha, comparación y **vista previa de química**; modo química en el campo.
+- **Estadísticas individuales simuladas** (goles, asistencias, minutos, nota, xG/xA estimados, porteros) por competición, premios, récords y detalle de cada partido. Son simulación, no datos reales.
+- Historial con el XI guardado: "Ver XI" y "Abrir temporada" (reconstrucción idéntica).
 - Vitrina de 4 trofeos con estado WON / RUNNER-UP / ELIMINATED / NOT QUALIFIED y celebración del quadruple.
 
 ## Deployment

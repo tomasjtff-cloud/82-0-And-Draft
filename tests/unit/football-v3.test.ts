@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FB_CARD_BY_ID, captainSlots, createFbDraft, isFbComplete, pickCaptain, pickFb, slotById } from "@/features/football-draft/engine";
-import { buildFbSnapshot, buildSquad, lineupOf, snapshotIsComplete, userTeamInput } from "@/features/football-draft/squad";
+import { buildFbSnapshot, buildSquad, lineupOf, rebuildFromSnapshot, snapshotIsComplete, userTeamInput } from "@/features/football-draft/squad";
 import { createSeason, plTable, simulateRest, stepSeason, stepToNextUserMatch } from "@/features/football-simulation/season";
 import { aggregatePlayerStats, seasonRecords, teamAwards, userMatches } from "@/features/football-simulation/player-stats";
 import { BENCH_KEY } from "@/features/football-simulation/events";
@@ -115,6 +115,12 @@ describe("football V3: squad, events and stats", () => {
     expect(snap.players.length).toBe(11);
     const rebuilt = simulateRest(createSeason(snap.seasonSeed, snap.difficulty, userTeamInput(snap.formationId, snap.lineup, snap.captainId, snap.difficulty, snap.clubId, snap.clubName)));
     expect(rebuilt.matches).toEqual(season.matches);
+    const viaHelper = rebuildFromSnapshot(snap)!;
+    expect(viaHelper.season.matches).toEqual(season.matches);
+    expect(viaHelper.draft.lineup).toEqual(d.lineup);
+    expect(isFbComplete(viaHelper.draft)).toBe(true);
+    // an old save serialized through JSON still rebuilds
+    expect(rebuildFromSnapshot(JSON.parse(JSON.stringify(snap)))!.season.matches).toEqual(season.matches);
     expect(snapshotIsComplete(undefined)).toBe(false);
     expect(snapshotIsComplete({ ...snap, lineup: { ...snap.lineup, ST1: "no-such-card" } })).toBe(false);
   });

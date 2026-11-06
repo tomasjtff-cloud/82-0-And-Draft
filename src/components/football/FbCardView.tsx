@@ -5,7 +5,11 @@ import { rarityOf, STYLE_LABEL } from "@/lib/ratings/football";
 import type { FbPlayerSeason } from "@/types/football";
 import { VerifyBadge } from "@/components/common/VerifyBadge";
 
-const FRAME: Record<string, string> = { icon: "frame-icon", rare: "frame-gold", gold: "frame-gold", silver: "frame-silver", bronze: "frame-bronze" };
+/** Spanish names of the estimated attributes (all PAC…PHY / GK values are Legends Lab estimates). */
+export const OUT_LABELS: [string, string][] = [["PAC", "Ritmo"], ["SHO", "Tiro"], ["PAS", "Pase"], ["DRI", "Regate"], ["DEF", "Defensa"], ["PHY", "Físico"]];
+export const GK_LABELS: [string, string][] = [["DIV", "Estirada"], ["HAN", "Manejo"], ["KIC", "Saque"], ["REF", "Reflejos"], ["SPD", "Velocidad"], ["POS", "Colocación"]];
+const LABEL_ES: Record<string, string> = Object.fromEntries([...OUT_LABELS, ...GK_LABELS]);
+export const FRAME: Record<string, string> = { icon: "frame-icon", rare: "frame-gold", gold: "frame-gold", silver: "frame-silver", bronze: "frame-bronze" };
 
 export function FbCardView({ card, onPick, pickLabel = "Elegir", index = 0, highlight, testId, disabled }: {
   card: FbPlayerSeason; onPick?: () => void; pickLabel?: string; index?: number; highlight?: boolean; testId?: string; disabled?: boolean;
@@ -13,8 +17,8 @@ export function FbCardView({ card, onPick, pickLabel = "Elegir", index = 0, high
   const r = rarityOf(card.ovr);
   const club = HIST_CLUB_BY_ID[card.clubId];
   const stats: [string, number][] = card.gk
-    ? [["DIV", card.gk.div], ["HAN", card.gk.han], ["KIC", card.gk.kic], ["REF", card.gk.ref], ["SPD", card.gk.spd], ["POS", card.gk.pos]]
-    : [["PAC", card.attrs!.pac], ["SHO", card.attrs!.sho], ["PAS", card.attrs!.pas], ["DRI", card.attrs!.dri], ["DEF", card.attrs!.def], ["PHY", card.attrs!.phy]];
+    ? GK_LABELS.map(([k]) => [k, card.gk![k.toLowerCase() as keyof typeof card.gk]] as [string, number])
+    : OUT_LABELS.map(([k]) => [k, card.attrs![k.toLowerCase() as keyof typeof card.attrs]] as [string, number]);
   const dark = r.key === "silver" || r.key === "gold" || r.key === "rare" || r.key === "icon";
   return (
     <motion.article initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: index * 0.06, duration: 0.3 }}
@@ -40,7 +44,7 @@ export function FbCardView({ card, onPick, pickLabel = "Elegir", index = 0, high
         <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-1">
           {stats.map(([k, v]) => (
             <div key={k} className="flex items-baseline justify-between border-b border-black/15 font-mono text-sm">
-              <span className="font-cond text-[11px] font-extrabold">{k}</span><span className="font-bold tabular">{v}</span>
+              <span className="font-cond text-[11px] font-extrabold" title={LABEL_ES[k]}>{k}<sup className="opacity-60">*</sup></span><span className="font-bold tabular">{v}</span>
             </div>
           ))}
         </div>
@@ -54,7 +58,7 @@ export function FbCardView({ card, onPick, pickLabel = "Elegir", index = 0, high
             Etapa {card.check.spell.start ?? "?"}–{card.check.spell.end ?? "…"}{card.check.spell.apps != null ? ` · ${card.check.spell.apps} PJ` : ""}{card.check.spell.goals != null ? ` · ${card.check.spell.goals} goles` : ""} (Wikidata)
           </p>
         )}
-        <p className="mt-1 text-[9.5px] leading-snug opacity-75">Atributos PAC/SHO/… estimados por Legends Lab (no EA). Datos verificados: solo los marcados con fuente.</p>
+        <p className="mt-1 text-[9.5px] leading-snug opacity-75">* Atributo estimado por Legends Lab (no EA). Datos verificados: solo los marcados con fuente.</p>
         {onPick && (
           <button className="mt-3 w-full rounded-lg bg-black/85 py-2 font-cond text-sm font-bold uppercase tracking-wider text-gold-2 transition hover:bg-black disabled:opacity-40"
             onClick={onPick} disabled={disabled} data-testid={testId ?? `fb-pick-${card.id}`}>{pickLabel}</button>
@@ -78,6 +82,26 @@ export function FbMiniCard({ card, pos, chem, fit, selected, captain }: { card: 
           {[0, 1, 2].map((i) => <span key={i} className={`h-1 flex-1 rounded-full ${i < chem ? "bg-[#0b6b3a]" : "bg-black/20"}`} />)}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Compact candidate row for the draft drawer (tap = details, ⇄ = compare). */
+export function FbCandidateRow({ card, onOpen, onCompare, comparing, ownChem }: { card: FbPlayerSeason; onOpen: () => void; onCompare?: () => void; comparing?: boolean; ownChem?: number }) {
+  const r = rarityOf(card.ovr);
+  const labels = card.gk ? GK_LABELS : OUT_LABELS;
+  const vals = labels.map(([k]) => (card.gk ? card.gk[k.toLowerCase() as keyof typeof card.gk] : card.attrs![k.toLowerCase() as keyof typeof card.attrs]) as number);
+  return (
+    <div className={`flex items-center gap-2 py-2 ${comparing ? "rounded-lg bg-gold/10" : ""}`} data-testid="fb-candidate">
+      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left" data-testid="fb-candidate-open" data-card-id={card.id}>
+        <span className={`grid h-12 w-11 shrink-0 place-items-center rounded-lg p-[1.5px] ${FRAME[r.key]}`}><span className="font-display text-xl leading-none text-[#16120a]">{card.ovr}</span></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-cond text-base font-bold uppercase leading-tight">{card.name}</span>
+          <span className="block truncate text-[11px] text-muted">{card.positions.join("/")} · {card.season} · {card.nation}{card.check?.membership === "verified" ? " · ✓" : ""}{ownChem != null ? ` · quím. ${ownChem}` : ""}</span>
+          <span className="mt-0.5 grid grid-cols-6 gap-1 font-mono text-[10px] tabular text-muted">{labels.map(([k], i) => <span key={k}><b className="text-text">{vals[i]}</b> {k}</span>)}</span>
+        </span>
+      </button>
+      {onCompare && <button onClick={onCompare} className={`btn btn-sm shrink-0 px-2 ${comparing ? "border-gold text-gold-2" : ""}`} aria-label="Comparar" data-testid="fb-compare-toggle">⇄</button>}
     </div>
   );
 }

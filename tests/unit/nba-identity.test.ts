@@ -9,7 +9,8 @@ describe("NBA team identity", () => {
     expect(validateIdentityPart("Mexico City", "Ciudad")).toBeNull();
     expect(validateIdentityPart("   ", "Ciudad")).toMatch(/vacío/);
     expect(validateIdentityPart("x".repeat(40), "Nombre")).toMatch(/máximo/);
-    expect(cleanIdentityPart("<b>São​  Paulo</b>")).toBe("bSão PaulobPaulo".slice(0, 0) + "bSão Paulob");
+    expect(validateIdentityPart("<b>", "Ciudad")).toMatch(/solo letras/);
+    expect(cleanIdentityPart("<b>São​  Paulo</b>")).toBe("bSão Paulob");
     expect(fullTeamName({ city: "Mexico City", name: "Legends" })).toBe("Mexico City Legends");
     expect(sanitizeIdentity({ city: "", name: "" })).toEqual(DEFAULT_NBA_IDENTITY);
     expect(sanitizeIdentity(undefined)).toEqual(DEFAULT_NBA_IDENTITY);

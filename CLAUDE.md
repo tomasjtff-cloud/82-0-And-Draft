@@ -88,5 +88,12 @@ GitHub Pages (`.github/workflows/pages.yml`) queda solo como espejo manual (`wor
 ## Fútbol Monte Carlo
 `src/features/football-simulation/monte-carlo.ts` (motor real, semillas `${seed}#fbmc${i}`, IC Wilson) + `mc.worker.ts` (lotes, progreso, cancelación) + `src/hooks/useFootballMonteCarlo.ts`.
 
+## V3 (resumen técnico)
+- **Identidad NBA**: `lib/core/identity.ts` (validación/sanitizado); `NbaDraftState.identity?` + `ll:nba:identity:v1`. Cosmético: nunca entra en semillas.
+- **Fútbol XI**: `features/football-draft/squad.ts` → `userTeamInput` (entrada exacta del motor y del MC), `buildFbSnapshot` (historial), `rebuildFromSnapshot`.
+- **Eventos**: `football-simulation/events.ts` (RNG `fb-events:${seed}:${matchId}`) genera `Match.detail` solo para partidos del usuario; los goles suman exactamente el marcador (sin tanda). `player-stats.ts` agrega por competición, premios y récords.
+- **Química**: `chemistryLinks` y `previewFbPick` en `lib/ratings/football.ts` reutilizan `computeChemistry` (preview = resultado final, testeado).
+- **UI**: `components/football/{Pitch,FbCardView,FbPlayerSheet,XiModal,SeasonExtras,SeasonView,MonteCarloPanel}.tsx`.
+
 ## Estado / siguientes pasos
 Ver `ROADMAP.md`. Al terminar una sesión: actualizar ROADMAP.md y CHANGELOG.md, commit descriptivo, push y verificar.

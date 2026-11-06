@@ -17,6 +17,8 @@ _Última actualización: 2026-11-06_
 
 - [x] V2 (2026-11-06): pools NBA sin duplicados, ratings v2 calibrados con RAPTOR, modelo de equipo recalibrado, liga 31 equipos + playoffs, box scores y estadísticas simuladas, química explicable con vista previa, VER MI QUINTETO (draft/resultados/historial/recarga), rediseño móvil NBA, Monte Carlo de fútbol en Web Worker.
 
+- [x] V3 (2026-11-06): identidad de equipo NBA; draft de fútbol rediseñado (cajón, ficha, comparación, preview de química, modo química), VER MI XI, eventos y estadísticas individuales simuladas, premios/récords, resumen de temporada, Monte Carlo integrado con comparación, snapshots de XI en historial con reapertura.
+
 ## Pendiente (prioridad)
 1. Verificar medias por partido NBA (PPG/RPG…) con una fuente con licencia (538 no las incluye; BALLDONTLIE de pago). 
 1b. **Verificación de datos con API**: ejecutar `scripts/import-nba.ts` con clave y plan adecuado; revisar diffs; marcar filas `api-verified`.
@@ -26,14 +28,15 @@ _Última actualización: 2026-11-06_
 4. Soporte de inglés (diccionario i18n).
 5. Ampliar combinaciones finas: NBA franquicia-década con <3 cartas (ver `npm run validate:data`), más clubes de fútbol (Everton, Leeds, Forest 70-80s, Roma, Lazio, Sevilla, PSV…).
 6. Sonidos opcionales con control de volumen.
-7. Monte Carlo para fútbol (probabilidad de cada título) y comparación de semillas lado a lado.
-8. Ejecutar Monte Carlo pesado en Web Worker.
+7. Comparación de semillas lado a lado (fútbol y NBA).
+8. Fútbol: banquillo real (hoy las sustituciones se agregan como "Banquillo"), lesiones y rotación.
 
 ## Errores / limitaciones conocidos
 - Datos `manual-curation`: pueden contener pequeñas imprecisiones; los campos dudosos se dejaron `null`.
 - Ratings de clubes 2026/27, campo de Champions y clubes EFL: escenario aproximado, no listas oficiales.
 - Calendario 2026/27: plantilla aproximada (fechas plausibles, no oficiales).
 - Desempates UCL más allá de victorias fuera usan rating como proxy del coeficiente.
+- Estadísticas individuales de fútbol: simulación estimada (no datos reales); sustitutos agregados en "Banquillo".
 - `npm run lint` no configurado (ESLint no instalado).
 
 ## Dependencias externas / bloqueos

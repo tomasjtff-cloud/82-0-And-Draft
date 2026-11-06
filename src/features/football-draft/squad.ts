@@ -5,7 +5,8 @@ import { FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
 import { computeChemistry, slotFit, teamRatings } from "@/lib/ratings/football";
 import type { DraftMode, FbDraftState, FbPlayerSeason, SquadMember } from "@/types/football";
-import { FB_CARD_BY_ID } from "./engine";
+import { createFbDraft, FB_CARD_BY_ID } from "./engine";
+import { createSeason, simulateRest, type SeasonState } from "@/features/football-simulation/season";
 import type { UserTeamInput } from "@/features/football-simulation/season";
 
 export function lineupOf(lineup: Record<string, string>): Record<string, FbPlayerSeason | undefined> {
@@ -57,4 +58,12 @@ export function buildFbSnapshot(d: FbDraftState, seasonSeed: string, clubId: str
 /** A snapshot can rebuild the XI only if every stable card id still exists in the dataset. */
 export function snapshotIsComplete(s: FbSquadSnapshot | undefined | null): boolean {
   return !!s && s.version === 1 && Object.keys(s.lineup).length === 11 && Object.values(s.lineup).every((id) => !!FB_CARD_BY_ID[id]) && !!FORMATION_BY_ID[s.formationId];
+}
+
+/** Rebuilds the frozen draft + the exact finished season from a history snapshot (deterministic: same seeds, same XI). */
+export function rebuildFromSnapshot(s: FbSquadSnapshot): { draft: FbDraftState; season: SeasonState } | null {
+  if (!snapshotIsComplete(s)) return null;
+  const draft: FbDraftState = { ...createFbDraft(s.draftSeed, s.difficulty, s.mode, s.formationId), lineup: { ...s.lineup }, captainId: s.captainId, currentSlot: null, spin: null, filter: null, options: [], step: 11 };
+  const season = simulateRest(createSeason(s.seasonSeed, s.difficulty, userTeamInput(s.formationId, s.lineup, s.captainId, s.difficulty, s.clubId, s.clubName, s.replacedClubId)));
+  return { draft, season };
 }

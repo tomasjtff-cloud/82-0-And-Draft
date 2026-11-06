@@ -16,7 +16,7 @@ export function validateIdentityPart(raw: string, label: string): string | null 
   const v = cleanIdentityPart(raw);
   if (!v) return `${label}: no puede estar vacío.`;
   if (raw.trim().length > IDENTITY_MAX) return `${label}: máximo ${IDENTITY_MAX} caracteres.`;
-  if (!ALLOWED.test(v)) return `${label}: usa solo letras, números, espacios y . ' - &`;
+  if (new RegExp(FORBIDDEN.source).test(raw) || !ALLOWED.test(v)) return `${label}: usa solo letras, números, espacios y . ' - &`;
   return null;
 }
 

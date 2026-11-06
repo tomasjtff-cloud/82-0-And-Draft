@@ -114,3 +114,11 @@ El marcador se decide primero; `boxscore.ts` reparte esos puntos exactos entre l
 
 ## Fútbol — Monte Carlo
 Cada iteración i ejecuta `simulateRest(createSeason(seed#fbmc i))`: el mismo motor del Quick Sim (sorteos, calendario, fatiga, localía, química/formación vía ATT/DEF del XI, dificultad). Se registran posición, puntos, GF/GA y la ronda más profunda en cada copa. Probabilidades = frecuencias k/N con intervalo de Wilson al 95 % (con k=0 el límite superior ≈ 3/N). Corre en un Web Worker en lotes de 10–25 temporadas con progreso, cancelación (resultados parciales) y fallback en el hilo principal. Rendimiento: ~12 ms por temporada en escritorio (sorteo de Champions constructivo).
+
+## V3 — XI de fútbol, eventos individuales e identidad NBA
+- `features/football-draft/squad.ts`: el XI congelado (`SquadMember[]`) viaja en `UserTeamInput.squad`; `userTeamInput` es la única fuente de ATT/DEF/OVR para temporada y Monte Carlo. `FbSquadSnapshot` (v1) se guarda en `HistoryEntry.football`; `rebuildFromSnapshot` regenera draft + temporada idénticos.
+- `football-simulation/events.ts`: tras simular el marcador, los partidos del usuario reciben `detail` (goles con minuto/asistencia/penal/prórroga, líneas por jugador, tiros, posesión) con RNG propio `fb-events:${seed}:${matchId}`. Invariantes testeadas: Σ goles = marcador (sin tanda), asistencias ≤ goles, minutos coherentes, porterías a cero ⇔ 0 encajados, Live = Quick.
+- `football-simulation/player-stats.ts`: agregados por competición, premios (MVP = Σ(nota−6)), récords.
+- `lib/ratings/football.ts`: `chemistryLinks` (vínculos club/nación/liga) y `previewFbPick` (antes/después) sobre `computeChemistry`.
+- Identidad NBA: `lib/core/identity.ts`; guardada en el draft y en `NbaTeamSnapshot`; nunca entra en semillas.
+- Compatibilidad: temporadas sin `squad`/`detail` muestran aviso; entradas de historial sin snapshot muestran "Partida antigua".
