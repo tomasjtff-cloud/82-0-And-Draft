@@ -5,7 +5,7 @@
 - Verificación con fuentes reales: FiveThirtyEight RAPTOR (CC BY 4.0) para NBA 1977-2022 y Wikidata (CC0) para fútbol y NBA fuera de ese rango; métricas reales (minutos, RAPTOR, WAR; partidos/goles de la etapa) en las cartas; insignias de verificación.
 - Filas contradichas excluidas del draft; `npm run verify:data`.
 - Rate limit en el proxy de BALLDONTLIE.
-- Deployment en Vercel con despliegue automático desde `main`; secciones Deployment y Sports Data Providers en README.
+- Deployment en GitHub Pages (export estático) con despliegue automático desde `main`; CI en GitHub Actions; secciones Deployment y Sports Data Providers en README.
 ### Corregido
 - Liam Brady (Inter): temporada corregida a 1984/85 tras contradicción con Wikidata.
 

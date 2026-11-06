@@ -74,7 +74,7 @@ tests/unit/*.test.ts · tests/e2e/smoke.mjs
 - Usuario como club real: su XI sustituye la plantilla. Fantasy FC sustituye a un club PL elegido (siguen 20). El usuario siempre juega la Champions (regla fantástica, reemplaza al inglés más débil).
 
 ## Deployment
-Vercel (Hobby), proyecto conectado a GitHub: push a `main` = producción. Sin variables obligatorias. Detalles y URL en README/ROADMAP.
+GitHub Pages (export estático, `.github/workflows/pages.yml`): push a `main` = producción en https://tomasjtff-cloud.github.io/82-0-And-Draft/. `GITHUB_PAGES=true` activa `output: export` + basePath; el workflow elimina `src/app/api` antes del build. Probar el export localmente: `GITHUB_PAGES=true npm run build`, servir `out/` bajo `/82-0-And-Draft/`, y `BASE_URL=... npm run e2e`.
 
 ## Estado / siguientes pasos
 Ver `ROADMAP.md`. Al terminar una sesión: actualizar ROADMAP.md y CHANGELOG.md, commit descriptivo, push y verificar.

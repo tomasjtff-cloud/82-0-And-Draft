@@ -3,9 +3,9 @@
 _Última actualización: 2026-11-06_
 
 ## Estado del deployment (2026-11-06)
-- Código listo para Vercel (`vercel.json`, Next.js detectado, sin variables obligatorias). Build de producción verificado en local.
-- CI: `.github/workflows/ci.yml` (typecheck, tests, validate:data, build) en cada push/PR.
-- **Pendiente:** crear el proyecto en Vercel. El token guardado en el entorno cloud no se aplicó en la sesión que lo pidió; se aplica en una sesión nueva. Alternativa manual (2 min): vercel.com/new → Import `tomasjtff-cloud/82-0-And-Draft` → Deploy. Después: probar la URL de producción (e2e: `BASE_URL=https://<dominio> npm run e2e`).
+- Plataforma elegida: **GitHub Pages** (export estático, gratis). Vercel se descartó en esta sesión porque el token guardado no se aplicó; el repo sigue siendo compatible con Vercel/Netlify.
+- Workflow `pages.yml`: build y tests OK; requiere activar Pages una vez (Settings → Pages → Source: GitHub Actions).
+- E2E completo verificado contra el export estático servido bajo `/82-0-And-Draft/`.
 
 ## Completado
 - [x] Fase 1 — Base: Next.js 15 + TS + Tailwind 4 + Motion, sistema visual, landing, tests, docs.

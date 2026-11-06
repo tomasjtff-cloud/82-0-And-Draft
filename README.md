@@ -59,11 +59,12 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 
 ## Deployment
 
-- **Plataforma:** Vercel (plan gratuito Hobby). Framework detectado: Next.js; build `npm run build`; sin variables de entorno obligatorias.
-- **Despliegue automático:** el proyecto de Vercel está conectado a `tomasjtff-cloud/82-0-And-Draft`; cada push a `main` genera un deployment de producción y cada rama/PR un preview.
-- **Sin servidor propio ni base de datos:** los datasets y las verificaciones se empaquetan en el build (respuesta instantánea en drafts, cero llamadas a APIs durante las partidas). Las partidas, el historial y el mejor récord se guardan en el `localStorage` del navegador del dispositivo.
-- **Variables opcionales** (Vercel → Project → Settings → Environment Variables, nunca con prefijo `NEXT_PUBLIC_`): `BALLDONTLIE_API_KEY`, `FOOTBALL_DATA_API_KEY`, `API_FOOTBALL_KEY`.
-- URL de producción y estado: ver `ROADMAP.md` → “Estado del deployment”.
+- **Plataforma:** **GitHub Pages** (gratis, sin cuenta adicional). URL: **https://tomasjtff-cloud.github.io/82-0-And-Draft/**
+- **Cómo funciona:** `.github/workflows/pages.yml` ejecuta los tests, compila un *export* estático de Next.js (`GITHUB_PAGES=true` → `basePath=/82-0-And-Draft`) y lo publica. Cada push a `main` despliega automáticamente.
+- **Activación (una sola vez):** GitHub → repo → Settings → Pages → *Build and deployment* → Source: **GitHub Actions**.
+- **Qué incluye:** ambos juegos completos (se ejecutan en el navegador), datos y verificaciones empaquetados. Partidas, historial y mejor récord se guardan en el `localStorage` de cada dispositivo.
+- **Qué no incluye en Pages:** las rutas opcionales `/api/data/*` (necesitan servidor). Si algún día quieres usarlas con claves, el mismo repo despliega sin cambios en Vercel o Netlify (`vercel.json` incluido; build `npm run build`).
+- **CI:** `.github/workflows/ci.yml` (typecheck, tests, validate:data, build) en cada push/PR.
 
 ## Sports Data Providers
 
