@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-11-06
+### Cambiado
+- Fútbol · Historical Roulette: la química pesa el 40 % (`CHEM_WEIGHT.roulette = 0.4`) sobre ATT/DEF, porque club + década por posición vuelven los vínculos cuestión de suerte. En Normal el efecto pasa de −2,4…+1,6 a −0,96…+0,64. FUT Draft sin cambios. La vista previa, VER MI XI, la temporada y el Monte Carlo usan el mismo peso; el historial guarda el peso usado (partidas antiguas = 1, se reabren idénticas).
+
 ## 0.4.0 — 2026-11-06 (Legends Lab V3)
 ### Añadido
 - NBA: ciudad + nombre del equipo personalizables (validados, por defecto "Legends Lab"), visibles en draft, 82 partidos, clasificación, playoffs, Finals, resultados, Monte Carlo, quinteto e historial. Solo cosmético: no toca semillas, calendario, rivales ni dificultad. Partidas antiguas siguen abriéndose.

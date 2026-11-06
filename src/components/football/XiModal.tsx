@@ -9,13 +9,13 @@ import { chemistryEffect, chemistryLinks, computeChemistry, teamRatings } from "
 import { lineupOf, type FbSquadSnapshot } from "@/features/football-draft/squad";
 import { ChemLegend, Pitch } from "./Pitch";
 
-export interface XiSource { formationId: string; lineup: Record<string, string>; captainId: string | null; difficulty: Difficulty; title?: string }
+export interface XiSource { formationId: string; lineup: Record<string, string>; captainId: string | null; difficulty: Difficulty; title?: string; chemWeight?: number }
 
 export function XiButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
   return <button className="btn btn-sm" onClick={onClick} disabled={disabled} data-testid="view-xi">⚽ <span className="sm:hidden">Mi XI</span><span className="hidden sm:inline">Ver mi XI</span></button>;
 }
 
-export const xiFromSnapshot = (s: FbSquadSnapshot): XiSource => ({ formationId: s.formationId, lineup: s.lineup, captainId: s.captainId, difficulty: s.difficulty, title: s.clubName });
+export const xiFromSnapshot = (s: FbSquadSnapshot): XiSource => ({ formationId: s.formationId, lineup: s.lineup, captainId: s.captainId, difficulty: s.difficulty, title: s.clubName, chemWeight: s.chemWeight ?? 1 });
 
 /** "VER MI XI": full pitch with the eleven in their positions, chemistry mode and per-player details. */
 export function XiModal({ open, onClose, xi, children }: { open: boolean; onClose: () => void; xi: XiSource | null; children?: React.ReactNode }) {
@@ -27,7 +27,7 @@ export function XiModal({ open, onClose, xi, children }: { open: boolean; onClos
     const lc: Record<string, FbPlayerSeason | undefined> = lineupOf(xi.lineup);
     const chem = computeChemistry(fm, lc, leagueOf, xi.captainId);
     const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
-    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens), links: chemistryLinks(fm, lc, leagueOf), effect: chemistryEffect(chem.total, sens) };
+    return { fm, lc, chem, r: teamRatings(fm, lc, chem.total, sens, xi.chemWeight ?? 1), links: chemistryLinks(fm, lc, leagueOf), effect: chemistryEffect(chem.total, sens, xi.chemWeight ?? 1) };
   }, [xi]);
   return (
     <Sheet open={open} onClose={onClose} title={xi?.title ? `Mi XI · ${xi.title}` : "Mi XI"} testId="xi-modal">

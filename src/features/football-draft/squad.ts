@@ -3,7 +3,7 @@ import type { Difficulty } from "@/lib/core/difficulty";
 import { DIFFICULTY_PARAMS } from "@/lib/core/difficulty";
 import { FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { HIST_CLUB_BY_ID, leagueOf } from "@/lib/data/football/clubs";
-import { computeChemistry, slotFit, teamRatings } from "@/lib/ratings/football";
+import { chemWeightFor, computeChemistry, slotFit, teamRatings } from "@/lib/ratings/football";
 import type { DraftMode, FbDraftState, FbPlayerSeason, SquadMember } from "@/types/football";
 import { createFbDraft, FB_CARD_BY_ID } from "./engine";
 import { createSeason, simulateRest, type SeasonState } from "@/features/football-simulation/season";
@@ -24,11 +24,11 @@ export function buildSquad(formationId: string, lineup: Record<string, string>, 
 }
 
 /** The exact input the season engine (and Monte Carlo) receive for this XI. */
-export function userTeamInput(formationId: string, lineup: Record<string, string>, captainId: string | null, difficulty: Difficulty, clubId: string, name: string, replacedClubId?: string, withSquad = true): UserTeamInput {
+export function userTeamInput(formationId: string, lineup: Record<string, string>, captainId: string | null, difficulty: Difficulty, clubId: string, name: string, replacedClubId?: string, withSquad = true, chemWeight = 1): UserTeamInput {
   const fm = FORMATION_BY_ID[formationId];
   const lc = lineupOf(lineup);
   const chem = computeChemistry(fm, lc, leagueOf, captainId);
-  const r = teamRatings(fm, lc, chem.total, DIFFICULTY_PARAMS[difficulty].fbFitSensitivity);
+  const r = teamRatings(fm, lc, chem.total, DIFFICULTY_PARAMS[difficulty].fbFitSensitivity, chemWeight);
   return { clubId, name, rating: r.ovr, att: r.att, def: r.def, replacedClubId, ...(withSquad ? { squad: buildSquad(formationId, lineup, captainId) } : {}) };
 }
 
@@ -37,6 +37,8 @@ export interface FbSquadSnapshot {
   seasonSeed: string; draftSeed: string; difficulty: Difficulty; mode: DraftMode;
   formationId: string; captainId: string | null; lineup: Record<string, string>; // slotId → stable card id
   clubId: string; clubName: string; replacedClubId?: string;
+  /** Chemistry weight used for this season (absent in pre-0.4.1 saves → 1). */
+  chemWeight?: number;
   chemistry: number; ovr: number; attack: number; midfield: number; defense: number;
   players: { slotId: string; pos: string; cardId: string; name: string; club: string; season: string; ovr: number; chem: number; captain: boolean }[];
   result?: { plPos: number; pts: number; trophies: string[] };
@@ -46,10 +48,11 @@ export function buildFbSnapshot(d: FbDraftState, seasonSeed: string, clubId: str
   const fm = FORMATION_BY_ID[d.formationId];
   const lc = lineupOf(d.lineup);
   const chem = computeChemistry(fm, lc, leagueOf, d.captainId);
-  const r = teamRatings(fm, lc, chem.total, DIFFICULTY_PARAMS[d.difficulty].fbFitSensitivity);
+  const chemWeight = chemWeightFor(d.mode);
+  const r = teamRatings(fm, lc, chem.total, DIFFICULTY_PARAMS[d.difficulty].fbFitSensitivity, chemWeight);
   return {
     version: 1, seasonSeed, draftSeed: d.seed, difficulty: d.difficulty, mode: d.mode, formationId: d.formationId, captainId: d.captainId, lineup: { ...d.lineup },
-    clubId, clubName, replacedClubId, chemistry: chem.total, ovr: r.ovr, attack: r.attack, midfield: r.midfield, defense: r.defense,
+    clubId, clubName, replacedClubId, chemWeight, chemistry: chem.total, ovr: r.ovr, attack: r.attack, midfield: r.midfield, defense: r.defense,
     players: buildSquad(d.formationId, d.lineup, d.captainId).map((m) => ({ slotId: m.slotId, pos: m.pos, cardId: m.cardId, name: m.name, club: HIST_CLUB_BY_ID[m.clubId]?.name ?? m.clubId, season: m.season, ovr: m.ovr, chem: m.chem, captain: m.captain })),
     result,
   };
@@ -64,6 +67,6 @@ export function snapshotIsComplete(s: FbSquadSnapshot | undefined | null): boole
 export function rebuildFromSnapshot(s: FbSquadSnapshot): { draft: FbDraftState; season: SeasonState } | null {
   if (!snapshotIsComplete(s)) return null;
   const draft: FbDraftState = { ...createFbDraft(s.draftSeed, s.difficulty, s.mode, s.formationId), lineup: { ...s.lineup }, captainId: s.captainId, currentSlot: null, spin: null, filter: null, options: [], step: 11 };
-  const season = simulateRest(createSeason(s.seasonSeed, s.difficulty, userTeamInput(s.formationId, s.lineup, s.captainId, s.difficulty, s.clubId, s.clubName, s.replacedClubId)));
+  const season = simulateRest(createSeason(s.seasonSeed, s.difficulty, userTeamInput(s.formationId, s.lineup, s.captainId, s.difficulty, s.clubId, s.clubName, s.replacedClubId, true, s.chemWeight ?? 1)));
   return { draft, season };
 }

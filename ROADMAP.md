@@ -19,6 +19,8 @@ _Última actualización: 2026-11-06_
 
 - [x] V3 (2026-11-06): identidad de equipo NBA; draft de fútbol rediseñado (cajón, ficha, comparación, preview de química, modo química), VER MI XI, eventos y estadísticas individuales simuladas, premios/récords, resumen de temporada, Monte Carlo integrado con comparación, snapshots de XI en historial con reapertura.
 
+- [x] 0.4.1: química con peso 0.4 en Historical Roulette (FUT intacto).
+
 ## Pendiente (prioridad)
 1. Verificar medias por partido NBA (PPG/RPG…) con una fuente con licencia (538 no las incluye; BALLDONTLIE de pago). 
 1b. **Verificación de datos con API**: ejecutar `scripts/import-nba.ts` con clave y plan adecuado; revisar diffs; marcar filas `api-verified`.

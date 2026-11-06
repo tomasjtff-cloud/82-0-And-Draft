@@ -7,7 +7,7 @@ import { BENCH_KEY } from "@/features/football-simulation/events";
 import { runSeed, simulateOne } from "@/features/football-simulation/monte-carlo";
 import { FORMATION_BY_ID } from "@/lib/data/football/formations";
 import { leagueOf } from "@/lib/data/football/clubs";
-import { computeChemistry, previewFbPick } from "@/lib/ratings/football";
+import { CHEM_WEIGHT, chemWeightFor, computeChemistry, previewFbPick, teamRatings } from "@/lib/ratings/football";
 import type { FbDraftState } from "@/types/football";
 
 function draft(seed: string, mode: "roulette" | "fut", formation = "4-3-3"): FbDraftState {
@@ -142,5 +142,37 @@ describe("football chemistry preview", () => {
       }
       expect(buildSquad(s.formationId, s.lineup, s.captainId).reduce((a, m) => a + m.chem, 0)).toBe(computeChemistry(fm, lineupOf(s.lineup), leagueOf, s.captainId).total);
     }
+  });
+});
+
+describe("chemistry weight per draft mode", () => {
+  it("Historical Roulette weighs chemistry less than FUT", () => {
+    expect(chemWeightFor("roulette")).toBeLessThan(chemWeightFor("fut"));
+    expect(chemWeightFor("fut")).toBe(1);
+    const d = draft("w1", "roulette");
+    const fm = FORMATION_BY_ID[d.formationId], lc = lineupOf(d.lineup);
+    const lo = teamRatings(fm, lc, 0, 1, CHEM_WEIGHT.roulette), hi = teamRatings(fm, lc, 33, 1, CHEM_WEIGHT.roulette);
+    const loF = teamRatings(fm, lc, 0, 1, 1), hiF = teamRatings(fm, lc, 33, 1, 1);
+    expect(hi.att - lo.att).toBeCloseTo((hiF.att - loF.att) * CHEM_WEIGHT.roulette, 5);
+  });
+  it("roulette snapshot stores the weight and rebuilds the same season; old saves default to 1", () => {
+    const d = draft("w2", "roulette");
+    const w = chemWeightFor(d.mode);
+    const played = simulateRest(createSeason("w2-season", "NORMAL", userTeamInput(d.formationId, d.lineup, d.captainId, "NORMAL", "ARS", "Arsenal", undefined, true, w)));
+    const snap = buildFbSnapshot(d, "w2-season", "ARS", "Arsenal");
+    expect(snap.chemWeight).toBe(w);
+    expect(rebuildFromSnapshot(snap)!.season.matches).toEqual(played.matches);
+    const legacy = { ...snap }; delete legacy.chemWeight;
+    const old = simulateRest(createSeason("w2-season", "NORMAL", userTeamInput(d.formationId, d.lineup, d.captainId, "NORMAL", "ARS", "Arsenal")));
+    expect(rebuildFromSnapshot(legacy)!.season.matches).toEqual(old.matches);
+  });
+  it("preview with the roulette weight matches final ratings", () => {
+    const d = draft("w3", "roulette");
+    const fm = FORMATION_BY_ID[d.formationId];
+    const slot = fm.slots[fm.slots.length - 1].id;
+    const partial = { ...lineupOf(d.lineup) }; const card = partial[slot]!; delete partial[slot];
+    const p = previewFbPick(fm, partial, slot, card, leagueOf, d.captainId, 1, CHEM_WEIGHT.roulette);
+    const r = teamRatings(fm, lineupOf(d.lineup), computeChemistry(fm, lineupOf(d.lineup), leagueOf, d.captainId).total, 1, CHEM_WEIGHT.roulette);
+    expect(p.attAfter).toBeCloseTo(r.att, 6);
   });
 });

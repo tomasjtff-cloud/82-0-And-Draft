@@ -118,8 +118,15 @@ const ATT_POS: FbPos[] = ["ST", "CF", "LW", "RW"];
 const MID_POS: FbPos[] = ["CAM", "CM", "CDM", "LM", "RM"];
 const DEF_POS: FbPos[] = ["CB", "LB", "RB", "LWB", "RWB"];
 
+/**
+ * How much chemistry moves ATT/DEF in each draft mode. Historical Roulette forces club + decade per slot,
+ * so links are mostly luck: chemistry weighs 40 % there. FUT Draft keeps the full effect.
+ */
+export const CHEM_WEIGHT: Record<"roulette" | "fut", number> = { roulette: 0.4, fut: 1 };
+export const chemWeightFor = (mode: "roulette" | "fut" | undefined | null) => CHEM_WEIGHT[mode ?? "fut"] ?? 1;
+
 export function teamRatings(
-  formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, chem: number, fitSensitivity = 1,
+  formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, chem: number, fitSensitivity = 1, chemWeight = 1,
 ): FbTeamRatings {
   const parts = { att: [] as number[], mid: [] as number[], def: [] as number[], gk: [] as number[], all: [] as number[] };
   const outOfPosition: string[] = [];
@@ -152,7 +159,7 @@ export function teamRatings(
   const midfield = mean(parts.mid, ovr - 8);
   const defense = mean(parts.def, ovr - 8);
   const gk = mean(parts.gk, 40);
-  const chemAdj = (chem / 33 - 0.6) * 4 * fitSensitivity;
+  const chemAdj = (chem / 33 - 0.6) * 4 * fitSensitivity * chemWeight;
   const notes: string[] = [];
   if (parts.att.length === 0) notes.push("Sin atacantes: el gol dependerá del mediocampo.");
   if (parts.def.length < 3) notes.push("Línea defensiva muy corta.");
@@ -207,7 +214,7 @@ export interface FbPickPreview {
 }
 const KIND_ES = { club: "club", nation: "nacionalidad", league: "liga" } as const;
 
-export function previewFbPick(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, slotId: string, card: FbPlayerSeason, leagueOf: (clubId: string) => string, captainId: string | null, fitSensitivity = 1): FbPickPreview {
+export function previewFbPick(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, slotId: string, card: FbPlayerSeason, leagueOf: (clubId: string) => string, captainId: string | null, fitSensitivity = 1, chemWeight = 1): FbPickPreview {
   const before = computeChemistry(formation, lineup, leagueOf, captainId);
   const nextLineup = { ...lineup, [slotId]: card };
   const after = computeChemistry(formation, nextLineup, leagueOf, captainId);
@@ -223,9 +230,9 @@ export function previewFbPick(formation: Formation, lineup: Record<string, FbPla
   if (outOfPosition) reasons.push(`Fuera de posición en ${slot.pos}: su química individual será 0.`);
   for (const [k, names] of shared) reasons.push(`Comparte ${KIND_ES[k as keyof typeof KIND_ES]} con ${[...names].slice(0, 4).join(", ")}${names.size > 4 ? "…" : ""}.`);
   if (!reasons.length) reasons.push("No comparte club, nacionalidad ni liga con nadie del XI todavía.");
-  const rb = teamRatings(formation, lineup, before.total, fitSensitivity), ra = teamRatings(formation, nextLineup, after.total, fitSensitivity);
+  const rb = teamRatings(formation, lineup, before.total, fitSensitivity, chemWeight), ra = teamRatings(formation, nextLineup, after.total, fitSensitivity, chemWeight);
   return { before: before.total, after: after.total, delta: after.total - before.total, changes, newLinks, ownChem: after.perSlot[slotId] ?? 0, outOfPosition, reasons, attBefore: rb.att, attAfter: ra.att, defBefore: rb.def, defAfter: ra.def };
 }
 
-/** How chemistry moves the match engine inputs: (chem/33 − 0.6)·4 on ATT and DEF (scaled by difficulty). */
-export const chemistryEffect = (chem: number, fitSensitivity = 1) => Math.round((chem / 33 - 0.6) * 4 * fitSensitivity * 10) / 10;
+/** How chemistry moves the match engine inputs: (chem/33 − 0.6)·4 on ATT and DEF (× difficulty × mode weight). */
+export const chemistryEffect = (chem: number, fitSensitivity = 1, chemWeight = 1) => Math.round((chem / 33 - 0.6) * 4 * fitSensitivity * chemWeight * 10) / 10;

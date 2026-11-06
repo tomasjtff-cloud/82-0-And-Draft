@@ -7,12 +7,12 @@ import { leagueOf } from "@/lib/data/football/clubs";
 import { FbCardView, GK_LABELS, OUT_LABELS } from "./FbCardView";
 
 /** Candidate detail + REAL chemistry preview (same engine) + optional side-by-side comparison. */
-export function FbPlayerSheet({ card, compareWith, formation, lineup, slotId, captainId, fitSensitivity, pickLabel = "Elegir", onPick, onClose }: {
+export function FbPlayerSheet({ card, compareWith, formation, lineup, slotId, captainId, fitSensitivity, chemWeight = 1, pickLabel = "Elegir", onPick, onClose }: {
   card: FbPlayerSeason | null; compareWith?: FbPlayerSeason | null; formation: Formation; lineup: Record<string, FbPlayerSeason | undefined>;
-  slotId: string | null; captainId: string | null; fitSensitivity: number; pickLabel?: string; onPick: (c: FbPlayerSeason) => void; onClose: () => void;
+  slotId: string | null; captainId: string | null; fitSensitivity: number; chemWeight?: number; pickLabel?: string; onPick: (c: FbPlayerSeason) => void; onClose: () => void;
 }) {
-  const p = useMemo(() => (card && slotId ? previewFbPick(formation, lineup, slotId, card, leagueOf, captainId, fitSensitivity) : null), [card, slotId, formation, lineup, captainId, fitSensitivity]);
-  const q = useMemo(() => (compareWith && slotId ? previewFbPick(formation, lineup, slotId, compareWith, leagueOf, captainId, fitSensitivity) : null), [compareWith, slotId, formation, lineup, captainId, fitSensitivity]);
+  const p = useMemo(() => (card && slotId ? previewFbPick(formation, lineup, slotId, card, leagueOf, captainId, fitSensitivity, chemWeight) : null), [card, slotId, formation, lineup, captainId, fitSensitivity, chemWeight]);
+  const q = useMemo(() => (compareWith && slotId ? previewFbPick(formation, lineup, slotId, compareWith, leagueOf, captainId, fitSensitivity, chemWeight) : null), [compareWith, slotId, formation, lineup, captainId, fitSensitivity, chemWeight]);
   const nameOf = (id: string) => lineup[id]?.name ?? card?.name ?? id;
   return (
     <Sheet open={!!card} onClose={onClose} title={card?.name ?? ""} testId="fb-player-sheet">

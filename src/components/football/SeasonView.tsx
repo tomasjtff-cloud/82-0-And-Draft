@@ -283,7 +283,8 @@ function SummaryTab({ s, xi, narrative, done }: { s: SeasonState; xi: XiSource |
     if (!xi) return null;
     const fm = FORMATION_BY_ID[xi.formationId]; const lc = lineupOf(xi.lineup);
     const chem = computeChemistry(fm, lc, leagueOf, xi.captainId); const sens = DIFFICULTY_PARAMS[xi.difficulty].fbFitSensitivity;
-    return { chem: chem.total, effect: chemistryEffect(chem.total, sens), r: teamRatings(fm, lc, chem.total, sens), fm, lc, perSlot: chem.perSlot };
+    const w = xi.chemWeight ?? 1;
+    return { chem: chem.total, effect: chemistryEffect(chem.total, sens, w), r: teamRatings(fm, lc, chem.total, sens, w), fm, lc, perSlot: chem.perSlot };
   }, [xi]);
   const topScorers = [...rows].filter((r) => r.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 3);
   return (
