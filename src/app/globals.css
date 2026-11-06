@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Anton", "Impact", "Arial Narrow Bold", sans-serif;
+  --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-cond: "Barlow Condensed", "Arial Narrow", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-ink: #06070a;
+  --color-surface: #0e1014;
+  --color-surface-2: #15181e;
+  --color-surface-3: #1d2129;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.16);
+  --color-text: #f3f4f6;
+  --color-muted: #8d94a0;
+  --color-dim: #5c6370;
+
+  --color-nba: #ff6a13;
+  --color-nba-2: #ffb347;
+  --color-nba-deep: #3a1606;
+  --color-court: #c98a4b;
+
+  --color-pitch: #0c3b25;
+  --color-pitch-2: #11502f;
+  --color-gold: #d9b45a;
+  --color-gold-2: #f3dc94;
+
+  --color-win: #3ddc84;
+  --color-loss: #ff4d5e;
+  --color-draw: #b8bec9;
+}
+
+:root { color-scheme: dark; }
+
+html, body { background: var(--color-ink); color: var(--color-text); }
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.font-display { font-family: var(--font-display); letter-spacing: 0.01em; }
+.font-cond { font-family: var(--font-cond); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* subtle film grain + vignette for the premium dark look */
+.grain::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.panel {
+  background: linear-gradient(180deg, rgb(255 255 255 / .035), rgb(255 255 255 / .01));
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .55rem;
+  border-radius: 999px; border: 1px solid var(--color-line-strong);
+  font-family: var(--font-cond); font-weight: 600; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .75rem 1.25rem; border-radius: 12px; font-family: var(--font-cond);
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .95rem;
+  transition: transform .15s ease, background .2s ease, border-color .2s ease, opacity .2s;
+  border: 1px solid var(--color-line-strong); background: var(--color-surface-2); color: var(--color-text);
+  cursor: pointer; user-select: none;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); border-color: rgb(255 255 255 / .3); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn-nba { background: var(--color-nba); border-color: var(--color-nba); color: #140700; }
+.btn-nba:hover:not(:disabled) { background: #ff7d33; }
+.btn-gold { background: var(--color-gold); border-color: var(--color-gold); color: #1a1405; }
+.btn-gold:hover:not(:disabled) { background: var(--color-gold-2); }
+.btn-ghost { background: transparent; }
+.btn-sm { padding: .45rem .8rem; font-size: .8rem; border-radius: 10px; }
+
+:focus-visible { outline: 2px solid var(--color-nba-2); outline-offset: 2px; border-radius: 6px; }
+
+/* Basketball court (pure CSS/SVG, original) */
+.court {
+  background:
+    radial-gradient(ellipse at 50% 120%, rgb(0 0 0 / .45), transparent 60%),
+    repeating-linear-gradient(90deg, #b67a3f 0 38px, #c08447 38px 76px);
+  border-radius: 22px; border: 2px solid rgb(255 255 255 / .18);
+}
+
+/* Football pitch */
+.pitch {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / .06), transparent 60%),
+    repeating-linear-gradient(180deg, var(--color-pitch) 0 9%, var(--color-pitch-2) 9% 18%);
+  border-radius: 20px; border: 2px solid rgb(255 255 255 / .14);
+}
+
+/* Card rarity frames */
+.frame-icon { background: linear-gradient(150deg, #fff3c4 0%, #d9b45a 30%, #7a5a14 70%, #f3dc94 100%); }
+.frame-gold { background: linear-gradient(150deg, #f7e08f 0%, #c9a23c 45%, #8a6a18 100%); }
+.frame-silver { background: linear-gradient(150deg, #f2f4f7 0%, #a8b0bb 50%, #5d6570 100%); }
+.frame-bronze { background: linear-gradient(150deg, #e9b48a 0%, #a8693c 50%, #5b3315 100%); }
+
+.scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(255 255 255 / .12); border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before { animation-duration: .001ms !important; transition-duration: .001ms !important; }
