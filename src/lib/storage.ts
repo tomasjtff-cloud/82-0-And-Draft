@@ -5,6 +5,7 @@ export const KEYS = {
   nbaBest: "ll:nba:best:v1",
   nbaDraft: "ll:nba:draft:v1",
   nbaLast: "ll:nba:last:v1",
+  nbaIdentity: "ll:nba:identity:v1",
   fbSession: "ll:fb:session:v1",
 } as const;
 
@@ -39,6 +40,8 @@ export interface HistoryEntry {
   score: number;      // wins (nba) or trophies (football)
   /** v2+: full team snapshot (older entries don't have it and stay readable) */
   nba?: import("@/types/nba").NbaTeamSnapshot;
+  /** v3+: full football XI (older football entries don't have it) */
+  football?: import("@/features/football-draft/squad").FbSquadSnapshot;
 }
 
 export function addHistory(e: Omit<HistoryEntry, "id" | "date">): void {

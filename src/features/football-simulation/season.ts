@@ -7,13 +7,18 @@
 import { Rng, type RngState } from "@/lib/core/rng";
 import { DIFFICULTY_PARAMS, type Difficulty } from "@/lib/core/difficulty";
 import { EFL_CLUBS, EURO_CLUBS, FANTASY_ID, PL_CLUBS } from "@/lib/data/football/world";
-import type { CompId, Match, SimTeam, StandingRow, Tie } from "@/types/football";
+import type { CompId, Match, SimTeam, SquadMember, StandingRow, Tie } from "@/types/football";
+import { generateMatchEvents } from "./events";
 import { buildCalendar, type SeasonEvent } from "./calendar";
 import { roundRobin, sortPremierLeague, sortUclLeague, standings } from "./league";
 import { drawLeaguePhase, makePots, type LeagueFixture } from "./ucl-draw";
 import { decidedWinner, playMatch, type Decider, type Side } from "./match";
 
-export interface UserTeamInput { clubId: string; name: string; rating: number; att: number; def: number; replacedClubId?: string }
+export interface UserTeamInput {
+  clubId: string; name: string; rating: number; att: number; def: number; replacedClubId?: string;
+  /** the drafted XI; when present, individual events are simulated for every user match (cosmetic RNG stream) */
+  squad?: SquadMember[];
+}
 
 export interface SeasonState {
   version: 1;
@@ -39,6 +44,8 @@ export interface SeasonState {
   uclBracket: string[] | null; // R16 tie ids in bracket order
   lastPlayed: Record<string, string[]>;
   rng: RngState;
+  /** user's XI (absent for Monte Carlo runs and pre-V3 saves) */
+  squad?: SquadMember[];
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
@@ -91,6 +98,7 @@ export function createSeason(seed: string, difficulty: Difficulty, user: UserTea
     version: 1, seed, difficulty, userId, notes, teams, plTeams, uclTeams, uclPots, faTeams, eflR2Teams, eflEuro,
     plFixtures: roundRobin(plTeams, rng), uclFixtures, events: buildCalendar(), cursor: 0, matches: [], ties: [],
     alive: { FA: [...faTeams], EFL: [] }, uclRanking: null, uclBracket: null, lastPlayed: {}, rng: rng.state(),
+    ...(user.squad ? { squad: user.squad } : {}),
   };
 }
 
@@ -113,6 +121,15 @@ function play(s: SeasonState, rng: Rng, home: string, away: string, ev: SeasonEv
     id: `${ev.id}-${home}-${away}`, comp: ev.comp, stage: ev.stage, date: ev.date, decider,
     neutral: extra.neutral, aggregateBefore: extra.aggregateBefore, tieId: extra.tieId, leg: extra.leg,
   });
+  if (s.squad && (home === s.userId || away === s.userId)) {
+    const userHome = home === s.userId;
+    m.detail = generateMatchEvents({
+      squad: s.squad, seed: s.seed, matchId: m.id, userSide: userHome ? "home" : "away",
+      goalsReg: userHome ? m.hg : m.ag, goalsEt: m.et ? (userHome ? m.et.hg : m.et.ag) : 0,
+      concededReg: userHome ? m.ag : m.hg, concededEt: m.et ? (userHome ? m.et.ag : m.et.hg) : 0,
+      extraTime: !!m.et, xgFor: userHome ? m.xg!.h : m.xg!.a, xgAgainst: userHome ? m.xg!.a : m.xg!.h,
+    });
+  }
   record(s, m);
   return m;
 }

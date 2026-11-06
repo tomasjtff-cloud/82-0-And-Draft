@@ -4,10 +4,10 @@ import { FRANCHISE_BY_ID } from "@/lib/data/nba/franchises";
 import { USER_ID, OUTCOME_LABEL } from "@/features/nba-simulation/engine";
 import type { NbaSeasonResult, PlayerTotals, PlayoffSeries, StandingEntry } from "@/types/nba";
 
-export const teamLabel = (id: string) => (id === USER_ID ? "TU QUINTETO" : `${FRANCHISE_BY_ID[id]?.city ?? id} ${FRANCHISE_BY_ID[id]?.name ?? ""}`);
-const short = (id: string) => (id === USER_ID ? "TÚ" : id);
+export const teamLabel = (id: string, userName = "Tu quinteto") => (id === USER_ID ? userName : `${FRANCHISE_BY_ID[id]?.city ?? id} ${FRANCHISE_BY_ID[id]?.name ?? ""}`);
+const short = (id: string, userName: string) => (id === USER_ID ? userName : id);
 
-export function StandingsView({ standings }: { standings: StandingEntry[] }) {
+export function StandingsView({ standings, userName = "Tu quinteto" }: { standings: StandingEntry[]; userName?: string }) {
   return (
     <div className="grid gap-4 md:grid-cols-2" data-testid="standings">
       {(["West", "East"] as const).map((c) => (
@@ -18,7 +18,7 @@ export function StandingsView({ standings }: { standings: StandingEntry[] }) {
             <tbody className="tabular">
               {standings.filter((s) => s.conference === c).map((s) => (
                 <tr key={s.team} className={`border-t border-line ${s.team === USER_ID ? "bg-nba/15 font-semibold" : ""} ${s.seed! > 8 ? "text-muted" : ""}`} data-testid={s.team === USER_ID ? "standing-user" : undefined}>
-                  <td className="px-2 py-1 font-mono">{s.seed}</td><td className="truncate">{teamLabel(s.team)}</td><td className="font-mono">{s.w}</td><td className="font-mono">{s.l}</td>
+                  <td className="px-2 py-1 font-mono">{s.seed}</td><td className="max-w-[160px] truncate">{teamLabel(s.team, userName)}</td><td className="font-mono">{s.w}</td><td className="font-mono">{s.l}</td>
                   <td className="font-mono">{(((s.pf - s.pa) / 82) > 0 ? "+" : "") + ((s.pf - s.pa) / 82).toFixed(1)}</td>
                 </tr>
               ))}
@@ -31,20 +31,20 @@ export function StandingsView({ standings }: { standings: StandingEntry[] }) {
   );
 }
 
-function SeriesCard({ s }: { s: PlayoffSeries }) {
+function SeriesCard({ s, userName }: { s: PlayoffSeries; userName: string }) {
   const mine = s.high === USER_ID || s.low === USER_ID;
   return (
     <div className={`rounded-lg border px-3 py-2 text-sm ${mine ? "border-nba/60 bg-nba/10" : "border-line bg-white/[.02]"}`} data-testid="series">
       {[[s.high, s.highSeed, s.winsHigh], [s.low, s.lowSeed, s.winsLow]].map(([t, seed, w]) => (
         <div key={t as string} className={`flex justify-between gap-2 ${s.winner === t ? "font-bold" : "text-muted"}`}>
-          <span className="truncate"><span className="font-mono text-[10px] text-dim">{seed}</span> {short(t as string)}</span><span className="font-mono">{w}</span>
+          <span className="truncate"><span className="font-mono text-[10px] text-dim">{seed}</span> {short(t as string, userName)}</span><span className="font-mono">{w}</span>
         </div>
       ))}
     </div>
   );
 }
 
-export function PlayoffsView({ result }: { result: NbaSeasonResult }) {
+export function PlayoffsView({ result, userName = "Tu quinteto" }: { result: NbaSeasonResult; userName?: string }) {
   const po = result.playoffs!;
   const [open, setOpen] = useState<string | null>(null);
   const userSeries = po.series.filter((s) => s.high === USER_ID || s.low === USER_ID);
@@ -62,11 +62,11 @@ export function PlayoffsView({ result }: { result: NbaSeasonResult }) {
       <div className={`panel p-4 ${po.outcome === "champion" ? "border-gold" : ""}`}>
         <div className="font-cond text-xs font-bold uppercase tracking-[.2em] text-muted">Resultado de playoffs</div>
         <div className={`font-display text-3xl ${po.outcome === "champion" ? "text-gold" : po.outcome === "missed" ? "text-muted" : "text-text"}`} data-testid="playoff-outcome" data-outcome={po.outcome}>{OUTCOME_LABEL[po.outcome]}</div>
-        <div className="text-xs text-muted">Campeón: {teamLabel(po.champion)}{po.userSeed ? ` · Tu siembra: ${po.userSeed}º Oeste` : ""}</div>
+        <div className="text-xs text-muted">Campeón: {teamLabel(po.champion, userName)}{po.userSeed ? ` · Tu siembra: ${po.userSeed}º Oeste` : ""}</div>
       </div>
       <div className="grid grid-cols-2 gap-3 overflow-x-auto sm:grid-cols-4 lg:grid-cols-7">
         {cols.map(([label, list]) => (
-          <div key={label} className="min-w-[120px] space-y-2"><h4 className="font-cond text-xs font-bold uppercase tracking-wider text-muted">{label}</h4>{list.map((s) => <SeriesCard key={s.id} s={s} />)}</div>
+          <div key={label} className="min-w-[120px] space-y-2"><h4 className="font-cond text-xs font-bold uppercase tracking-wider text-muted">{label}</h4>{list.map((s) => <SeriesCard key={s.id} s={s} userName={userName} />)}</div>
         ))}
       </div>
       {userSeries.length > 0 && (
@@ -75,7 +75,7 @@ export function PlayoffsView({ result }: { result: NbaSeasonResult }) {
           {userSeries.map((s) => (
             <div key={s.id} className="mt-2 border-t border-line pt-2">
               <button className="flex w-full justify-between text-left text-sm" onClick={() => setOpen(open === s.id ? null : s.id)}>
-                <span>{["", "Primera ronda", "Semifinal de conferencia", "Final de conferencia", "NBA Finals"][s.round]} vs {teamLabel(s.high === USER_ID ? s.low : s.high)}</span>
+                <span>{["", "Primera ronda", "Semifinal de conferencia", "Final de conferencia", "NBA Finals"][s.round]} vs {teamLabel(s.high === USER_ID ? s.low : s.high, userName)}</span>
                 <span className="font-mono">{s.high === USER_ID ? `${s.winsHigh}-${s.winsLow}` : `${s.winsLow}-${s.winsHigh}`} {s.winner === USER_ID ? "✓" : "✗"}</span>
               </button>
               {open === s.id && (

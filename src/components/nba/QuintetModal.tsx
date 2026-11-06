@@ -3,6 +3,7 @@ import { Sheet } from "@/components/common/Sheet";
 import type { NbaTeamSnapshot } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
 import { tierOf } from "./NbaCardView";
+import { fullTeamName } from "@/lib/core/identity";
 
 export function QuintetButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
   return <button className="btn btn-sm" onClick={onClick} disabled={disabled} data-testid="view-quintet">👕 <span className="sm:hidden">Quinteto</span><span className="hidden sm:inline">Ver mi quinteto</span></button>;
@@ -11,7 +12,7 @@ export function QuintetButton({ onClick, disabled }: { onClick: () => void; disa
 /** "VER MI QUINTETO": works from a live draft, results or a saved history snapshot. */
 export function QuintetModal({ open, onClose, snap, children }: { open: boolean; onClose: () => void; snap: NbaTeamSnapshot | null; children?: React.ReactNode }) {
   return (
-    <Sheet open={open} onClose={onClose} title="Mi quinteto" testId="quintet-modal">
+    <Sheet open={open} onClose={onClose} title={snap?.identity ? fullTeamName(snap.identity) : "Mi quinteto"} testId="quintet-modal">
       {!snap ? <p className="text-sm text-muted">Aún no has elegido jugadores.</p> : (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-2 text-center">

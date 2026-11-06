@@ -90,6 +90,29 @@ export interface Match {
   neutral?: boolean;
   tieId?: string;
   leg?: 1 | 2;
+  /** pre-match expected goals (λ incl. form; + λ/3 if extra time was played) — model expectation, not a real stat */
+  xg?: { h: number; a: number };
+  /** simulated individual events for the user's team (only when a squad is attached to the season) */
+  detail?: UserMatchDetail;
+}
+
+/** One of the user's eleven, frozen at season start (everything the event model needs). */
+export interface SquadMember {
+  slotId: string; pos: FbPos; cardId: string; name: string; clubId: string; season: string;
+  ovr: number; chem: number; fit: number; captain: boolean;
+  attrs: FbAttrs | null; gk: GkAttrs | null;
+}
+
+/** "BENCH" groups the generic substitutes. Penalty-shootout goals are never events. */
+export interface GoalEvent { minute: number; scorer: string; assist: string | null; penalty: boolean; extraTime: boolean }
+export interface FbPlayerLine {
+  key: string; started: boolean; min: number; goals: number; assists: number; shots: number; sot: number;
+  passes: number; passesOk: number; yellow: number; red: number; rating: number; xg: number; xa: number;
+  saves?: number; conceded?: number; cleanSheet?: boolean;
+}
+export interface UserMatchDetail {
+  userSide: "home" | "away"; goals: GoalEvent[]; lines: FbPlayerLine[];
+  shots: number; sot: number; oppShots: number; oppSot: number; possession: number;
 }
 
 export interface Tie {

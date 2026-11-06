@@ -180,3 +180,52 @@ export const STYLE_LABEL: Record<FbStyle, string> = {
   REG: "Regista", DLP: "Organizador defensivo", DES: "Destructor", STO: "Stopper", BPD: "Central con salida", LIB: "Líbero",
   AFB: "Lateral ofensivo", DFB: "Lateral defensivo", SST: "Paradas", SWK: "Portero líbero",
 };
+
+/* ───────── Chemistry links & pick preview (same engine, explanatory layer) ───────── */
+export interface ChemLink { a: string; b: string; kinds: ("club" | "nation" | "league")[] }
+
+/** Pairs of in-position players who share club, nation or league (the groups that feed computeChemistry). */
+export function chemistryLinks(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, leagueOf: (clubId: string) => string): ChemLink[] {
+  const placed = formation.slots.map((s) => ({ s, c: lineup[s.id] })).filter((x) => x.c && slotFit(x.c, x.s.pos) >= 0.9) as { s: Formation["slots"][number]; c: FbPlayerSeason }[];
+  const out: ChemLink[] = [];
+  for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+    const a = placed[i], b = placed[j];
+    const kinds: ChemLink["kinds"] = [];
+    if (a.c.clubId === b.c.clubId) kinds.push("club");
+    if (a.c.nation === b.c.nation) kinds.push("nation");
+    if (leagueOf(a.c.clubId) === leagueOf(b.c.clubId)) kinds.push("league");
+    if (kinds.length) out.push({ a: a.s.id, b: b.s.id, kinds });
+  }
+  return out;
+}
+
+export interface FbPickPreview {
+  before: number; after: number; delta: number;
+  changes: { slotId: string; name: string; from: number; to: number }[];
+  newLinks: ChemLink[]; ownChem: number; outOfPosition: boolean; reasons: string[];
+  attBefore: number; attAfter: number; defBefore: number; defAfter: number;
+}
+const KIND_ES = { club: "club", nation: "nacionalidad", league: "liga" } as const;
+
+export function previewFbPick(formation: Formation, lineup: Record<string, FbPlayerSeason | undefined>, slotId: string, card: FbPlayerSeason, leagueOf: (clubId: string) => string, captainId: string | null, fitSensitivity = 1): FbPickPreview {
+  const before = computeChemistry(formation, lineup, leagueOf, captainId);
+  const nextLineup = { ...lineup, [slotId]: card };
+  const after = computeChemistry(formation, nextLineup, leagueOf, captainId);
+  const changes = formation.slots.filter((s) => s.id !== slotId && lineup[s.id] && (before.perSlot[s.id] ?? 0) !== (after.perSlot[s.id] ?? 0))
+    .map((s) => ({ slotId: s.id, name: lineup[s.id]!.name, from: before.perSlot[s.id] ?? 0, to: after.perSlot[s.id] ?? 0 }));
+  const linksBefore = new Set(chemistryLinks(formation, lineup, leagueOf).map((l) => `${l.a}|${l.b}|${l.kinds.join()}`));
+  const newLinks = chemistryLinks(formation, nextLineup, leagueOf).filter((l) => (l.a === slotId || l.b === slotId) && !linksBefore.has(`${l.a}|${l.b}|${l.kinds.join()}`));
+  const slot = formation.slots.find((s) => s.id === slotId)!;
+  const outOfPosition = slotFit(card, slot.pos) < 0.9;
+  const shared = new Map<string, Set<string>>();
+  for (const l of newLinks) for (const k of l.kinds) { const other = l.a === slotId ? l.b : l.a; if (!shared.has(k)) shared.set(k, new Set()); shared.get(k)!.add(nextLineup[other]!.name); }
+  const reasons: string[] = [];
+  if (outOfPosition) reasons.push(`Fuera de posición en ${slot.pos}: su química individual será 0.`);
+  for (const [k, names] of shared) reasons.push(`Comparte ${KIND_ES[k as keyof typeof KIND_ES]} con ${[...names].slice(0, 4).join(", ")}${names.size > 4 ? "…" : ""}.`);
+  if (!reasons.length) reasons.push("No comparte club, nacionalidad ni liga con nadie del XI todavía.");
+  const rb = teamRatings(formation, lineup, before.total, fitSensitivity), ra = teamRatings(formation, nextLineup, after.total, fitSensitivity);
+  return { before: before.total, after: after.total, delta: after.total - before.total, changes, newLinks, ownChem: after.perSlot[slotId] ?? 0, outOfPosition, reasons, attBefore: rb.att, attAfter: ra.att, defBefore: rb.def, defAfter: ra.def };
+}
+
+/** How chemistry moves the match engine inputs: (chem/33 − 0.6)·4 on ATT and DEF (scaled by difficulty). */
+export const chemistryEffect = (chem: number, fitSensitivity = 1) => Math.round((chem / 33 - 0.6) * 4 * fitSensitivity * 10) / 10;

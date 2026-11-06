@@ -5,6 +5,7 @@ import type { NbaCard, NbaPos, NbaTeamSnapshot } from "@/types/nba";
 import { NBA_POSITIONS } from "@/types/nba";
 
 export function buildSnapshot(lineup: Partial<Record<NbaPos, NbaCard>>, difficulty: Difficulty, seed: string, draftSeed: string, extra: Partial<NbaTeamSnapshot> = {}): NbaTeamSnapshot {
+  // identity is cosmetic and travels with the snapshot (history), never with the simulation
   const e = evaluateNbaTeam(lineup, DIFFICULTY_PARAMS[difficulty].nbaFitSensitivity);
   return {
     version: 2, seed, draftSeed, difficulty,

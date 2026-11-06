@@ -15,6 +15,7 @@ import {
   respinEra, respinTeam, teamRespinOptions, versionsFor,
 } from "./engine";
 import { buildSnapshot } from "./snapshot";
+import { DEFAULT_NBA_IDENTITY, IDENTITY_MAX, fullTeamName, sanitizeIdentity, validateIdentityPart, type TeamIdentity } from "@/lib/core/identity";
 import { monteCarlo, simulateSeason, OUTCOME_LABEL, type MonteCarloSummary } from "@/features/nba-simulation/engine";
 import { DifficultySelector } from "@/components/common/DifficultySelector";
 import { Reel } from "@/components/common/Reel";
@@ -51,6 +52,8 @@ export function NbaGame() {
   const [showChem, setShowChem] = useState(false);
   const [listOpen, setListOpen] = useState(true);
   const [histSnap, setHistSnap] = useState<NbaTeamSnapshot | null>(null);
+  const [identityInput, setIdentityInput] = useState<TeamIdentity>(DEFAULT_NBA_IDENTITY);
+  const identityErrors = [validateIdentityPart(identityInput.city, "Ciudad"), validateIdentityPart(identityInput.name, "Nombre")].filter(Boolean) as string[];
 
   useEffect(() => {
     setBest(load(KEYS.nbaBest, null));
@@ -60,20 +63,27 @@ export function NbaGame() {
     const l = load<LastSession | null>(KEYS.nbaLast, null);
     setLast(l && l.draft && l.draft.lineup && isComplete(l.draft) ? l : null);
   }, [phase]);
+  useEffect(() => { setIdentityInput(sanitizeIdentity(load<TeamIdentity | null>(KEYS.nbaIdentity, null))); }, []);
   useEffect(() => { if (draft) save(KEYS.nbaDraft, draft); }, [draft]);
 
   const diff = draft?.difficulty ?? difficulty;
+  const identity = sanitizeIdentity(draft?.identity);
+  const teamName = fullTeamName(identity);
   const sens = DIFFICULTY_PARAMS[diff].nbaFitSensitivity;
   const lineup = useMemo(() => (draft ? lineupCards(draft) : {}), [draft]);
   const teamEval = useMemo(() => evaluateNbaTeam(lineup, sens), [lineup, sens]);
   const complete = draft ? isComplete(draft) : false;
-  const snapshot = useMemo(() => (draft && Object.keys(draft.lineup).length ? buildSnapshot(lineup, diff, season?.result.seed ?? "—", draft.seed, season ? { record: { wins: season.result.wins, losses: season.result.losses }, playoff: season.result.playoffs ? OUTCOME_LABEL[season.result.playoffs.outcome] : undefined } : {}) : null), [draft, lineup, diff, season]);
+  const snapshot = useMemo(() => (draft && Object.keys(draft.lineup).length ? buildSnapshot(lineup, diff, season?.result.seed ?? "—", draft.seed, { identity, ...(season ? { record: { wins: season.result.wins, losses: season.result.losses }, playoff: season.result.playoffs ? OUTCOME_LABEL[season.result.playoffs.outcome] : undefined } : {}) }) : null), [draft, lineup, diff, season, identity]);
   const spinKey = draft?.spin ? `${draft.round}:${draft.spin.franchiseId}:${draft.spin.decade}` : null;
   const isRevealed = !!spinKey && revealed === spinKey;
 
   const start = (seed = randomSeed()) => {
     setError(null); setSeason(null); setMc(null); setSelectedSlot(null); setRevealed(null);
-    setDraft(createDraft(seed, difficulty)); setPhase("draft");
+    if (identityErrors.length) { setError(identityErrors[0]); return; }
+    const id = sanitizeIdentity(identityInput);
+    save(KEYS.nbaIdentity, id);
+    // identity is attached to the draft but never passed to any engine/RNG
+    setDraft({ ...createDraft(seed, difficulty), identity: id }); setPhase("draft");
   };
   const resume = () => { if (!saved) return; setDifficulty(saved.difficulty); setDraft(saved); setRevealed(null); setPhase("draft"); };
   const openLast = () => {
@@ -98,8 +108,8 @@ export function NbaGame() {
     save(KEYS.nbaLast, { draft, seed });
     const names = NBA_POSITIONS.map((p) => lineup[p]?.name).join(", ");
     const outcome = result.playoffs ? OUTCOME_LABEL[result.playoffs.outcome] : undefined;
-    addHistory({ game: "nba", seed, difficulty: draft.difficulty, title: `${result.wins}-${result.losses}${result.playoffs?.outcome === "champion" ? " 🏆" : ""}`, detail: `${names}${outcome ? ` · ${outcome}` : ""}`, score: result.wins,
-      nba: buildSnapshot(lineup, draft.difficulty, seed, draft.seed, { record: { wins: result.wins, losses: result.losses }, playoff: outcome }) });
+    addHistory({ game: "nba", seed, difficulty: draft.difficulty, title: `${result.wins}-${result.losses}${result.playoffs?.outcome === "champion" ? " 🏆" : ""}`, detail: `${teamName} · ${names}${outcome ? ` · ${outcome}` : ""}`, score: result.wins,
+      nba: buildSnapshot(lineup, draft.difficulty, seed, draft.seed, { record: { wins: result.wins, losses: result.losses }, playoff: outcome, identity }) });
     const prev = load<{ wins: number } | null>(KEYS.nbaBest, null);
     if (!prev || result.wins > prev.wins) save(KEYS.nbaBest, { wins: result.wins, losses: result.losses, seed });
   };
@@ -126,10 +136,23 @@ export function NbaGame() {
             <h1 className="font-display mt-3 text-6xl leading-none md:text-8xl">NBA <span className="text-nba">82-0</span></h1>
             <p className="mt-3 text-lg">Build your legendary starting five. <span className="text-muted">Can you go undefeated?</span></p>
             <div className="panel mt-8 p-5">
-              <h2 className="mb-3 font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Dificultad</h2>
+              <h2 className="mb-3 font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Tu franquicia</h2>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs text-muted">Ciudad
+                  <input value={identityInput.city} maxLength={IDENTITY_MAX + 8} onChange={(e) => setIdentityInput((v) => ({ ...v, city: e.target.value }))} data-testid="team-city"
+                    className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base text-text" placeholder="Mexico City" autoComplete="off" enterKeyHint="next" />
+                </label>
+                <label className="text-xs text-muted">Nombre del equipo
+                  <input value={identityInput.name} maxLength={IDENTITY_MAX + 8} onChange={(e) => setIdentityInput((v) => ({ ...v, name: e.target.value }))} data-testid="team-name-input"
+                    className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base text-text" placeholder="Legends" autoComplete="off" enterKeyHint="done" />
+                </label>
+              </div>
+              <p className="mt-1 text-xs">{identityErrors.length ? <span className="text-loss" data-testid="identity-error">{identityErrors[0]}</span> : <span className="text-muted">Se jugará como <b className="text-text" data-testid="identity-preview">{fullTeamName(identityInput)}</b>. Solo cambia el nombre: no afecta al calendario, los rivales ni la simulación.</span>}</p>
+              <h2 className="mb-3 mt-5 font-cond text-sm font-bold uppercase tracking-[.2em] text-muted">Dificultad</h2>
               <DifficultySelector value={difficulty} onChange={setDifficulty} />
               <div className="mt-5 flex flex-wrap gap-3">
-                <button className="btn btn-nba" onClick={() => start()} data-testid="start-nba-draft">Nuevo draft</button>
+                <button className="btn btn-nba" onClick={() => start()} disabled={identityErrors.length > 0} data-testid="start-nba-draft">Nuevo draft</button>
+                {error && phase === "setup" && <span role="alert" className="self-center text-sm text-loss">{error}</span>}
                 {saved && !isComplete(saved) && <button className="btn" onClick={resume} data-testid="resume-draft">Continuar draft guardado</button>}
                 {last && <button className="btn" onClick={openLast} data-testid="open-last">Ver última temporada</button>}
                 <button className="btn btn-ghost" onClick={() => setHowTo((v) => !v)}>Cómo jugar</button>
@@ -188,7 +211,7 @@ export function NbaGame() {
               result={season.result} team={teamEval} animate={season.animate} mc={mc} mcBusy={mcBusy}
               onReplay={() => runSeason(season.result.seed)} onNewSeed={() => runSeason(randomSeed())}
               onCustomSeed={(s) => runSeason(s)} onMonteCarlo={runMc} onNewDraft={newDraft}
-              extra={<QuintetButton onClick={() => setShowQuintet(true)} />}
+              extra={<QuintetButton onClick={() => setShowQuintet(true)} />} teamName={teamName}
             />
           </div>
           <aside className="space-y-4">
@@ -216,7 +239,8 @@ export function NbaGame() {
     <div className="flex items-center gap-2">
       <span className="rounded-lg bg-nba px-2.5 py-1 font-display text-lg leading-none text-black" data-testid="round-indicator">RONDA {Math.min(5, draft.round + 1)}/5</span>
       <div className="flex gap-1" aria-hidden>{[0, 1, 2, 3, 4].map((i) => <span key={i} className={`h-1.5 w-5 rounded-full ${i < draft.round ? "bg-nba" : i === draft.round && !complete ? "bg-nba/50" : "bg-white/10"}`} />)}</div>
-      <span className="chip ml-auto text-[10px] text-muted">{draft.difficulty}</span>
+      <span className="ml-auto min-w-0 truncate font-cond text-sm font-bold uppercase text-nba-2" data-testid="draft-team-name">{teamName}</span>
+      <span className="chip text-[10px] text-muted">{draft.difficulty}</span>
       <QuintetButton onClick={() => setShowQuintet(true)} disabled={!Object.keys(draft.lineup).length} />
     </div>
   );

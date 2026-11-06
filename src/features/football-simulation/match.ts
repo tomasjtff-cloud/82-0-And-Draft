@@ -58,7 +58,7 @@ export function playMatch(rng: Rng, home: Side, away: Side, o: PlayOpts): Match 
   const lh = expectedGoals(H, A, o.neutral ? "neutral" : "home");
   const la = expectedGoals(A, H, o.neutral ? "neutral" : "away");
   const hg = goals(rng, lh), ag = goals(rng, la);
-  const m: Match = { id: o.id, comp: o.comp, stage: o.stage, date: o.date, home: home.id, away: away.id, hg, ag, neutral: !!o.neutral, tieId: o.tieId, leg: o.leg, et: null, pens: null };
+  const m: Match = { id: o.id, comp: o.comp, stage: o.stage, date: o.date, home: home.id, away: away.id, hg, ag, neutral: !!o.neutral, tieId: o.tieId, leg: o.leg, et: null, pens: null, xg: { h: lh, a: la } };
   if (o.decider === "none") return m;
   const aggH = (o.aggregateBefore?.home ?? 0) + hg;
   const aggA = (o.aggregateBefore?.away ?? 0) + ag;
@@ -66,6 +66,7 @@ export function playMatch(rng: Rng, home: Side, away: Side, o: PlayOpts): Match 
   if (o.decider === "et+pens") {
     const eh = goals(rng, lh / 3), ea = goals(rng, la / 3);
     m.et = { hg: eh, ag: ea };
+    m.xg = { h: lh * (4 / 3), a: la * (4 / 3) };
     if (aggH + eh !== aggA + ea) return m;
   }
   m.pens = penalties(rng, H, A);

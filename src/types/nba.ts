@@ -73,6 +73,8 @@ export interface NbaSpin {
 
 export interface NbaDraftState {
   seed: string;
+  /** cosmetic franchise identity (optional for older saves) */
+  identity?: import("@/lib/core/identity").TeamIdentity;
   difficulty: Difficulty;
   round: number;               // 0..4
   spin: NbaSpin | null;
@@ -148,4 +150,5 @@ export interface NbaTeamSnapshot {
   weaknesses: string[];
   record?: { wins: number; losses: number };
   playoff?: string;
+  identity?: import("@/lib/core/identity").TeamIdentity;
 }

@@ -8,8 +8,8 @@ import { seasonAnalysis, OUTCOME_LABEL, type MonteCarloSummary } from "@/feature
 import { PlayerStatsView, PlayoffsView, StandingsView } from "./PostseasonViews";
 import { Celebration } from "@/components/common/Celebration";
 
-export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCustomSeed, onMonteCarlo, mc, mcBusy, onNewDraft, extra }: {
-  result: NbaSeasonResult; team: NbaTeamEval; animate: number; extra?: React.ReactNode;
+export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCustomSeed, onMonteCarlo, mc, mcBusy, onNewDraft, extra, teamName = "Tu quinteto" }: {
+  result: NbaSeasonResult; team: NbaTeamEval; animate: number; extra?: React.ReactNode; teamName?: string;
   onReplay: () => void; onNewSeed: () => void; onCustomSeed: (s: string) => void;
   onMonteCarlo: (runs: number) => void; mc: MonteCarloSummary | null; mcBusy: boolean; onNewDraft: () => void;
 }) {
@@ -43,6 +43,7 @@ export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCu
       <section className={`panel relative overflow-hidden p-6 md:p-8 ${perfect ? "border-gold" : ""}`}>
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
+            <div className="truncate font-display text-2xl text-nba-2" data-testid="team-name">{teamName}</div>
             <div className="font-cond text-sm font-bold uppercase tracking-[.25em] text-muted">{done ? "Final record" : "Simulando temporada…"}</div>
             <div className="font-display text-7xl leading-none tabular md:text-9xl" data-testid="final-record">
               <span className="text-win">{w}</span><span className="text-dim">-</span><span className="text-loss">{l}</span>
@@ -112,25 +113,25 @@ export function SeasonResults({ result, team, animate, onReplay, onNewSeed, onCu
                 </button>
               ))}
             </div>
-            {inspect && <GameDetail g={inspect} />}
+            {inspect && <GameDetail g={inspect} teamName={teamName} />}
           </div>
           )}
-          {tab === "standings" && result.standings && <StandingsView standings={result.standings} />}
-          {tab === "playoffs" && result.playoffs && <PlayoffsView result={result} />}
+          {tab === "standings" && result.standings && <StandingsView standings={result.standings} userName={teamName} />}
+          {tab === "playoffs" && result.playoffs && <PlayoffsView result={result} userName={teamName} />}
           {tab === "stats" && result.stats && <PlayerStatsView stats={result.stats} />}
-          {tab === "mc" && <MonteCarloPanel mc={mc} busy={mcBusy} onRun={onMonteCarlo} />}
+          {tab === "mc" && <MonteCarloPanel mc={mc} busy={mcBusy} onRun={onMonteCarlo} teamName={teamName} />}
         </>
       )}
     </div>
   );
 }
 
-function GameDetail({ g }: { g: NbaGameResult }) {
+function GameDetail({ g, teamName }: { g: NbaGameResult; teamName: string }) {
   const opp = FRANCHISE_BY_ID[g.opponent];
   return (
     <div className="mt-4 rounded-xl border border-line bg-ink/60 p-4 text-sm" data-testid="game-detail">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-cond text-base font-bold uppercase">Partido {g.game} · {g.home ? "vs" : "@"} {opp.city} {opp.name}</div>
+        <div className="font-cond text-base font-bold uppercase">Partido {g.game} · {teamName} {g.home ? "vs" : "@"} {opp.city} {opp.name}</div>
         <span className={`chip ${g.win ? "text-win" : "text-loss"}`}>{g.win ? "Victoria" : "Derrota"}</span>
       </div>
       <div className="font-display mt-2 text-4xl tabular">{g.teamScore} – {g.oppScore}</div>
@@ -150,11 +151,11 @@ function GameDetail({ g }: { g: NbaGameResult }) {
   );
 }
 
-function MonteCarloPanel({ mc, busy, onRun }: { mc: MonteCarloSummary | null; busy: boolean; onRun: (n: number) => void }) {
+function MonteCarloPanel({ mc, busy, onRun, teamName }: { mc: MonteCarloSummary | null; busy: boolean; onRun: (n: number) => void; teamName: string }) {
   const maxBin = mc ? Math.max(...mc.distribution) : 1;
   return (
     <div className="panel p-5" data-testid="mc-panel">
-      <h3 className="font-cond text-lg font-bold uppercase tracking-wide">Monte Carlo</h3>
+      <h3 className="font-cond text-lg font-bold uppercase tracking-wide">Monte Carlo · {teamName}</h3>
       <p className="mt-1 text-xs text-muted">Repite la temporada con el mismo quinteto y semillas derivadas.</p>
       <div className="mt-3 flex gap-2">
         {[500, 2000].map((n) => <button key={n} disabled={busy} className="btn btn-sm" onClick={() => onRun(n)} data-testid={`mc-${n}`}>{busy ? "Simulando…" : `${n} temporadas`}</button>)}
