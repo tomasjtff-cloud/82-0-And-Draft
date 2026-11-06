@@ -10,7 +10,7 @@ Next.js 15 (App Router) · React 19 · TypeScript estricto · Tailwind CSS v4 (`
 
 ## Comandos
 ```bash
-npm run dev | npm run build | npm test | npm run typecheck | npm run validate:data
+npm run dev | npm run build | npm test | npm run typecheck | npm run validate:data | npm run verify:data
 npm run build && npm start   # luego: npm run e2e  (tests/e2e/smoke.mjs)
 ```
 Antes de cada commit: `npm test` y `npm run build` deben pasar.
@@ -33,10 +33,11 @@ src/
     data/nba/{franchises,players}.ts
     data/football/{clubs,players,formations,world}.ts
     ratings/{nba,nba-context,football}.ts
+    data/verification/             JSON generados por scripts/verify-*.ts + index.ts (capa de verificación)
     api/providers.ts               proveedores externos (solo servidor)
     storage.ts                     localStorage seguro
   types/{nba,football}.ts
-scripts/ validate-data.ts · import-nba.ts
+scripts/ validate-data.ts · import-nba.ts · verify-nba-538.ts · verify-wikidata.ts
 tests/unit/*.test.ts · tests/e2e/smoke.mjs
 ```
 
@@ -54,7 +55,7 @@ tests/unit/*.test.ts · tests/e2e/smoke.mjs
 3. Robos/tapones = `null` antes de 1973-74; 3P = `null` antes de 1979-80 (lo fuerza `r()`).
 4. Atributos de fútbol = estimación derivada (`estimateAttributes`) de `ovr` + estilo. Nunca presentarlos como EA.
 5. `leagueGoals` solo si es un dato conocido; si no, `null`.
-6. `verification: "manual-curation"` hasta contrastar con API; cambiar a `"api-verified"` solo tras revisión.
+6. La pertenencia se verifica externamente con `npm run verify:data` (FiveThirtyEight RAPTOR CC BY 4.0 para NBA 1977-2022; Wikidata CC0 P54 para el resto). Tras añadir filas: ejecutarlo, revisar `CONTRADICTED` y corregir/eliminar. Las contradichas se excluyen del draft automáticamente; las excepciones documentadas van en `OVERRIDES` (`src/lib/data/verification/index.ts`). Node fetch necesita `NODE_USE_ENV_PROXY=1` en el entorno cloud.
 7. Mundo 2026/27 (fuerzas, campos de Champions/EFL) es escenario aproximado: no usar resultados reales.
 
 ## Ampliar datos
@@ -71,6 +72,9 @@ tests/unit/*.test.ts · tests/e2e/smoke.mjs
 - **Champions**: 4 bombos de 9 por rating; cada equipo 2 rivales por bombo (1 casa/1 fuera), sin compatriotas, máx. 2 por país; 8 jornadas por emparejamientos perfectos con DFS. Playoffs 9–24, bracket R16 por pares de cabezas de serie, mejor clasificado cierra en casa.
 - **Copas**: FA Cup sin replays (prórroga+penales; SF y F neutrales). Carabao: penales directos hasta cuartos; SF ida/vuelta con prórroga en la vuelta; final neutral.
 - Usuario como club real: su XI sustituye la plantilla. Fantasy FC sustituye a un club PL elegido (siguen 20). El usuario siempre juega la Champions (regla fantástica, reemplaza al inglés más débil).
+
+## Deployment
+Vercel (Hobby), proyecto conectado a GitHub: push a `main` = producción. Sin variables obligatorias. Detalles y URL en README/ROADMAP.
 
 ## Estado / siguientes pasos
 Ver `ROADMAP.md`. Al terminar una sesión: actualizar ROADMAP.md y CHANGELOG.md, commit descriptivo, push y verificar.

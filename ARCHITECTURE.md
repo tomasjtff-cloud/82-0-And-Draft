@@ -18,7 +18,10 @@
 │ /api/data/nba/search   proxy BALLDONTLIE (clave solo en servidor)    │
 │ lib/api/providers.ts   fetch + caché en memoria (24 h) + errores     │
 └──────────────────────────────────────────────────────────────────────┘
-scripts/  validate-data.ts (integridad) · import-nba.ts (verificación vía API)
+scripts/  validate-data.ts (integridad) · verify-nba-538.ts + verify-wikidata.ts (verificación con fuentes reales) · import-nba.ts (BALLDONTLIE)
+
+Pipeline de datos: dataset curado (TS) → scripts de verificación (offline, con red) → JSON compactos en src/lib/data/verification → empaquetados en el build → la app
+no llama a ninguna API durante las partidas (rápido, sin cuotas, sin base de datos). Hosting: Vercel, estático + 2 rutas serverless.
 ```
 
 Separación de responsabilidades:
@@ -71,7 +74,9 @@ Parámetros explícitos (`lib/core/difficulty.ts`): boost de rivales, σ de marg
 ## Integraciones externas (estado)
 | Fuente | Estado | Limitación conocida |
 |---|---|---|
-| BALLDONTLIE | Proxy de búsqueda + importador de verificación | Free: teams/players/games, ~5 req/min; season averages de pago |
+| FiveThirtyEight RAPTOR (GitHub) | Integrado (build-time) | 1977-2022, solo temporada regular |
+| Wikidata SPARQL | Integrado (build-time) | Huecos en jugadores recientes / altas recientes |
+| BALLDONTLIE | Proxy de búsqueda (rate-limit 10/min/IP) + importador de verificación | Free: teams/players/games, ~5 req/min; season averages de pago |
 | nba_api / NBA.com Stats | No integrado | Librería Python no oficial; NBA.com suele bloquear IPs de nube |
 | football-data.org | Cliente preparado | Free: 12 competiciones, ~10 req/min, histórico limitado |
 | API-Football | Cliente preparado | Free: 100 req/día; temporadas antiguas limitadas |

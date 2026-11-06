@@ -32,6 +32,7 @@ npm run build && npm start
 | `npm test` | Tests unitarios/integración (Vitest): motores NBA, draft fútbol, competiciones |
 | `npm run typecheck` | TypeScript sin emitir |
 | `npm run validate:data` | Informe de integridad de los datasets |
+| `npm run verify:data` | Re-verifica pertenencias contra FiveThirtyEight y Wikidata |
 | `npm run e2e` | Smoke test end-to-end con Playwright (requiere servidor en :3000 y `playwright` disponible) |
 
 Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chromium`, luego `npm run build && npm start` en una terminal y `npm run e2e` en otra.
@@ -55,6 +56,33 @@ Para el e2e en tu máquina: `npm i -D playwright && npx playwright install chrom
 - Temporada 2026/27 (escenario de juego): Premier League completa (20 clubes, 380 partidos), Champions League con fase liga de 36 equipos + playoffs + eliminatorias, FA Cup desde 3ª ronda, Carabao Cup desde 2ª ronda.
 - Quick Sim y Live Season (partido a partido / evento a evento, se puede continuar más tarde).
 - Vitrina de 4 trofeos con estado WON / RUNNER-UP / ELIMINATED / NOT QUALIFIED y celebración del quadruple.
+
+## Deployment
+
+- **Plataforma:** Vercel (plan gratuito Hobby). Framework detectado: Next.js; build `npm run build`; sin variables de entorno obligatorias.
+- **Despliegue automático:** el proyecto de Vercel está conectado a `tomasjtff-cloud/82-0-And-Draft`; cada push a `main` genera un deployment de producción y cada rama/PR un preview.
+- **Sin servidor propio ni base de datos:** los datasets y las verificaciones se empaquetan en el build (respuesta instantánea en drafts, cero llamadas a APIs durante las partidas). Las partidas, el historial y el mejor récord se guardan en el `localStorage` del navegador del dispositivo.
+- **Variables opcionales** (Vercel → Project → Settings → Environment Variables, nunca con prefijo `NEXT_PUBLIC_`): `BALLDONTLIE_API_KEY`, `FOOTBALL_DATA_API_KEY`, `API_FOOTBALL_KEY`.
+- URL de producción y estado: ver `ROADMAP.md` → “Estado del deployment”.
+
+## Sports Data Providers
+
+| Proveedor | Licencia / coste | Qué aporta hoy | Cobertura confirmada |
+|---|---|---|---|
+| **FiveThirtyEight RAPTOR** (`fivethirtyeight/data`, GitHub) | CC BY 4.0, gratis | Verifica jugador–franquicia–temporada NBA y aporta minutos, posesiones, RAPTOR (O/D/total) y WAR reales | Temporadas 1976-77 → 2021-22 (fase regular) |
+| **Wikidata** (SPARQL, P54 “member of sports team”) | CC0, gratis | Verifica etapas jugador–club (fútbol y NBA fuera del rango de 538) con fechas y, cuando existen, partidos y goles de la etapa | Todas las décadas, con huecos en algunos jugadores recientes |
+| BALLDONTLIE | Free: teams/players/games; stats y medias por temporada desde plan de pago (ALL-STAR ≈ 9,99 USD/mes según fuentes de terceros) | Proxy de búsqueda en servidor (`/api/data/nba/search`) si hay clave | No probado con clave real |
+| football-data.org | Free: 12 competiciones, ~10 req/min, histórico limitado | Cliente preparado | No integrado: no cubre plantillas históricas de 1970-2000 |
+| API-Football | Free: 100 req/día | Cliente preparado | No integrado: el plan gratuito limita temporadas antiguas |
+| nba_api / stats.nba.com | No oficial | — | Descartado: NBA.com bloquea IPs de nube (inaccesible también desde este entorno) |
+| Transfermarkt | Términos prohíben extracción automatizada | Solo referencia manual | — |
+
+Regenerar verificaciones (requiere red a GitHub y Wikidata): `npm run verify:data`. Resultado actual: NBA 537/537 temporadas del rango de 538 verificadas + 91 verificadas y 25 probables vía Wikidata; fútbol 1.577/1.592 verificadas, 6 probables, 9 sin dato. Las filas contradichas por una fuente se excluyen del draft.
+
+Qué es real y qué es estimado:
+- **Real y verificado:** pertenencia jugador–club–temporada (insignia ✓), RAPTOR/WAR/minutos (NBA 1977-2022), partidos y goles de la etapa (Wikidata, cuando existen).
+- **Real, curado a mano:** medias por partido NBA (PPG, RPG…), goles de liga de algunas temporadas.
+- **Estimado (Legends Lab):** OVR y atributos de fútbol, ratings NBA derivados, fuerzas de clubes 2026/27.
 
 ## Integridad de datos (importante)
 
