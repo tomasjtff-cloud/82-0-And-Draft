@@ -20,9 +20,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="relative z-10 flex min-h-dvh flex-col">
         <header className="sticky top-0 z-40 border-b border-line bg-ink/80 backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2" aria-label="Legends Lab inicio">
+            <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="Legends Lab inicio">
               <Logo />
-              <span className="font-display text-xl tracking-wide">LEGENDS<span className="text-nba"> LAB</span></span>
+              <span className="font-display whitespace-nowrap text-lg tracking-wide sm:text-xl">LEGENDS<span className="text-nba"> LAB</span></span>
             </Link>
             <nav className="ml-auto flex gap-1 overflow-x-auto scrollbar-thin" aria-label="Principal">
               {NAV.map((n) => {

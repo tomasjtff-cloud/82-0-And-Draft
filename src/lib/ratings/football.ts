@@ -63,7 +63,7 @@ export function slotFit(card: Pick<FbPlayerSeason, "positions">, slotPos: FbPos)
   card.positions.forEach((p, i) => { best = Math.max(best, posCompat(p, slotPos) * (i === 0 ? 1 : 0.97)); });
   return best;
 }
-export const DRAFT_FIT_MIN = 0.85;
+export const DRAFT_FIT_MIN = 0.9;
 
 /* ───────── Chemistry (Legends Lab system, 0..33) ───────── */
 export interface ChemResult { total: number; perSlot: Record<string, number>; links: Record<string, string[]> }

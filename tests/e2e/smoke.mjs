@@ -101,7 +101,7 @@ async function footballFlow() {
   await page.getByTestId("fb-new").click();
   await page.getByTestId("fb-mode-fut").click();
   await page.getByTestId("fb-start").click();
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 20 && !(await page.getByTestId("fb-live-sim").isVisible()); i++) {
     const btn = page.locator('[data-testid^="fb-pick-"]').first();
     await btn.waitFor({ timeout: 10000 });
     await btn.click();
